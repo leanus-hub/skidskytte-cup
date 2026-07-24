@@ -135,33 +135,76 @@ function stringValue(obj: Record<string, unknown>, keys: string[]) {
 }
 
 function parseJson(value: unknown, sourceUsed: string): ImportedRace {
-  const objects: Record<string, unknown>[] = [];
-  collectObjects(value, objects);
+  const root = value && typeof value === 'object' ? value as Record<string, unknown> : {};
+  const klassResults = Array.isArray(root.klassResults) ? root.klassResults : [];
   const results: ImportedResult[] = [];
-  for (const obj of objects) {
-    const athleteName = stringValue(obj, ['name', 'Name', 'athleteName', 'AthleteName', 'fullName', 'FullName']);
-    const clubName = stringValue(obj, ['club', 'Club', 'clubName', 'ClubName', 'organization', 'Organisation']);
-    const className = stringValue(obj, ['class', 'Class', 'className', 'ClassName', 'category', 'Category']);
-    if (!athleteName || !clubName || !className) continue;
-    const placeText = stringValue(obj, ['place', 'Place', 'rank', 'Rank']);
-    const bibText = stringValue(obj, ['bib', 'Bib', 'startNumber', 'StartNumber']);
-    const shootingText = stringValue(obj, ['shooting', 'Shooting', 'shootings', 'Shootings', 'misses', 'Misses']);
-    const shooting = parseShooting([shootingText.replace(/[^0-5]/g, '')]);
-    results.push({
-      className,
-      place: parseInteger(placeText),
-      bib: parseInteger(bibText),
-      athleteName,
-      clubName,
-      status: parseStatus(stringValue(obj, ['status', 'Status']), placeText),
-      totalTimeMs: parseTimeMs(stringValue(obj, ['totalTime', 'TotalTime', 'time', 'Time'])),
-      shooting: shooting.misses,
-      shootingHits: shooting.hits,
-      shootingShots: shooting.shots,
-      raw: obj,
-    });
+
+  for (const klassValue of klassResults) {
+    if (!klassValue || typeof klassValue !== 'object') continue;
+    const klass = klassValue as Record<string, unknown>;
+    const className = stringValue(klass, ['klassName', 'className', 'ClassName']) || 'Okänd klass';
+    const participants = Array.isArray(klass.participants) ? klass.participants : [];
+
+    for (const participantValue of participants) {
+      if (!participantValue || typeof participantValue !== 'object') continue;
+      const participant = participantValue as Record<string, unknown>;
+      const athleteName = stringValue(participant, ['name', 'athleteName', 'fullName']);
+      const clubName = stringValue(participant, ['club', 'clubName', 'organization']);
+      if (!athleteName || !clubName) continue;
+
+      const placeText = stringValue(participant, ['place', 'rank']);
+      const prone = stringValue(participant, ['misses']);
+      const standing = stringValue(participant, ['missesStanding']);
+      const shooting = parseShooting([prone, standing]);
+
+      results.push({
+        className,
+        place: parseInteger(placeText),
+        bib: parseInteger(stringValue(participant, ['bib', 'startNumber'])),
+        athleteName,
+        clubName,
+        status: parseStatus(stringValue(participant, ['status', 'comment']), placeText),
+        totalTimeMs: parseTimeMs(stringValue(participant, ['totalTime', 'raceTime'])),
+        shooting: shooting.misses,
+        shootingHits: shooting.hits,
+        shootingShots: shooting.shots,
+        raw: participant,
+      });
+    }
   }
-  return { title: null, results, sourceUsed, warnings: results.length ? [] : ['Inga resultat kunde läsas ur JSON-svaret.'] };
+
+  // Fallback for possible older/generic BiathlonTiming JSON shapes.
+  if (!results.length) {
+    const objects: Record<string, unknown>[] = [];
+    collectObjects(value, objects);
+    for (const obj of objects) {
+      const athleteName = stringValue(obj, ['name', 'Name', 'athleteName', 'AthleteName', 'fullName', 'FullName']);
+      const clubName = stringValue(obj, ['club', 'Club', 'clubName', 'ClubName', 'organization', 'Organisation']);
+      const className = stringValue(obj, ['class', 'Class', 'className', 'ClassName', 'klassName', 'category', 'Category']);
+      if (!athleteName || !clubName || !className) continue;
+      const placeText = stringValue(obj, ['place', 'Place', 'rank', 'Rank']);
+      const shooting = parseShooting([
+        stringValue(obj, ['misses', 'Misses', 'shooting', 'Shooting']),
+        stringValue(obj, ['missesStanding', 'MissesStanding']),
+      ]);
+      results.push({
+        className,
+        place: parseInteger(placeText),
+        bib: parseInteger(stringValue(obj, ['bib', 'Bib', 'startNumber', 'StartNumber'])),
+        athleteName,
+        clubName,
+        status: parseStatus(stringValue(obj, ['status', 'Status']), placeText),
+        totalTimeMs: parseTimeMs(stringValue(obj, ['totalTime', 'TotalTime', 'time', 'Time'])),
+        shooting: shooting.misses,
+        shootingHits: shooting.hits,
+        shootingShots: shooting.shots,
+        raw: obj,
+      });
+    }
+  }
+
+  const title = stringValue(root, ['name', 'raceName', 'title']) || null;
+  return { title, results, sourceUsed, warnings: results.length ? [] : ['Inga resultat kunde läsas ur JSON-svaret.'] };
 }
 
 async function fetchSource(url: string) {
@@ -184,10 +227,8 @@ async function fetchSource(url: string) {
 
 export async function importBiathlonTiming(raceId: string, sourceUrl: string): Promise<ImportedRace> {
   const candidates = [
-    `https://ext.nytatime.se/race/?race=${encodeURIComponent(raceId)}`,
+    `https://biathlontiming-cdn-endpoint.azureedge.net/rest/results/${encodeURIComponent(raceId)}`,
     sourceUrl,
-    `https://www.biathlontiming.se/results?raceId=${encodeURIComponent(raceId)}`,
-    `https://results.biathlontiming.se/?raceId=${encodeURIComponent(raceId)}&print=1`,
   ];
   const errors: string[] = [];
   for (const candidate of [...new Set(candidates)]) {
