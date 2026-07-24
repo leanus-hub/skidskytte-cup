@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
-import { addClassAlias, createCup, createRace, importRaceResults, logout, setRaceStatus } from './admin-actions';
+import { addClassAlias, addClubAlias, createCup, createRace, importRaceResults, logout, setRaceStatus, updateClubRegion } from './admin-actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,11 +13,13 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   const { data: profile } = await supabase.from('profiles').select('display_name,is_admin').eq('id', user.id).single();
   if (!profile?.is_admin) redirect('/admin/login?error=not-admin');
 
-  const [{ data: seasons }, { data: cups }, { data: races }, { data: classes }] = await Promise.all([
+  const [{ data: seasons }, { data: cups }, { data: races }, { data: classes }, { data: regions }, { data: clubs }] = await Promise.all([
     supabase.from('seasons').select('id,name,is_active').order('starts_on', { ascending: false }),
-    supabase.from('cups').select('id,name,cup_type,season_id,seasons(name)').order('created_at', { ascending: false }),
+    supabase.from('cups').select('id,name,cup_type,region_id,season_id,seasons(name),regions(name)').order('created_at', { ascending: false }),
     supabase.from('races').select('id,name,race_date,status,cup_id,source_url,import_status,import_error,imported_result_count,imported_at,import_warnings,cups(name)').order('race_date', { ascending: false }),
     supabase.from('classes').select('id,name,aliases').eq('is_official', true).order('sort_order').order('name'),
+    supabase.from('regions').select('id,name').eq('active', true).order('sort_order'),
+    supabase.from('clubs').select('id,name,short_name,aliases,region_id,regions(name)').order('name'),
   ]);
 
   return (
@@ -34,7 +36,9 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       {params.success === 'race-published' && <p className="alert success">Deltävlingen är publicerad och ingår nu i cupställningen.</p>}
       {params.success === 'race-unpublished' && <p className="alert success">Deltävlingen är återställd till utkast.</p>}
       {params.success === 'class-alias-added' && <p className="alert success">Klassaliaset är sparat.</p>}
-      {params.success === 'results-imported' && <p className="alert success">Importen är klar: {params.count ?? '0'} resultat sparades. {Number(params.outside ?? 0) > 0 ? `${params.outside} resultat tillhör klubbar utanför Region Syd och får inga cuppoäng.` : ''}</p>}
+      {params.success === 'club-region-updated' && <p className="alert success">Föreningens region är uppdaterad.</p>}
+      {params.success === 'club-alias-added' && <p className="alert success">Föreningsaliaset är sparat.</p>}
+      {params.success === 'results-imported' && <p className="alert success">Importen är klar: {params.count ?? '0'} resultat sparades. {Number(params.outside ?? 0) > 0 ? `${params.outside} resultat tillhör föreningar som saknar region i klubbregistret och behöver kontrolleras.` : ''}</p>}
       {params.error && <p className="alert error">Något gick fel: {params.error}</p>}
 
       <div className="grid">
@@ -47,9 +51,11 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
               {(seasons ?? []).map(s => <option key={s.id} value={s.id}>{s.name}{s.is_active ? ' (aktiv)' : ''}</option>)}
             </select>
             <label htmlFor="cup_name">Cupnamn</label>
-            <input id="cup_name" name="name" required placeholder="Syd Cup Vinter 2026" />
+            <input id="cup_name" name="name" required placeholder="Region Syd Cup Vinter 2026" />
             <label htmlFor="cup_type">Typ</label>
             <select id="cup_type" name="cup_type" defaultValue="vinter"><option value="vinter">Vintercup</option><option value="sommar">Sommarcup</option></select>
+            <label htmlFor="region_id">Region</label>
+            <select id="region_id" name="region_id" required defaultValue=""><option value="" disabled>Välj region</option>{(regions ?? []).map(r => <option key={r.id} value={r.id}>{r.name}</option>)}</select>
             <button type="submit">Skapa cup</button>
           </form>
         </section>
@@ -75,8 +81,8 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
 
       <section className="card section-gap">
         <h2>Befintliga cuper</h2>
-        {(cups ?? []).length === 0 ? <p className="muted">Ingen cup skapad ännu.</p> : <table><thead><tr><th>Cup</th><th>Säsong</th><th>Typ</th></tr></thead><tbody>
-          {(cups ?? []).map(c => <tr key={c.id}><td><strong>{c.name}</strong></td><td>{Array.isArray(c.seasons) ? c.seasons[0]?.name : (c.seasons as {name?:string}|null)?.name}</td><td>{c.cup_type === 'sommar' ? 'Sommar' : 'Vinter'}</td></tr>)}
+        {(cups ?? []).length === 0 ? <p className="muted">Ingen cup skapad ännu.</p> : <table><thead><tr><th>Cup</th><th>Säsong</th><th>Typ</th><th>Region</th></tr></thead><tbody>
+          {(cups ?? []).map(c => <tr key={c.id}><td><strong>{c.name}</strong></td><td>{Array.isArray(c.seasons) ? c.seasons[0]?.name : (c.seasons as {name?:string}|null)?.name}</td><td>{c.cup_type === 'sommar' ? 'Sommar' : 'Vinter'}</td><td>{(Array.isArray(c.regions) ? c.regions[0]?.name : (c.regions as {name?:string}|null)?.name) ?? 'Region saknas'}</td></tr>)}
         </tbody></table>}
       </section>
 
@@ -107,6 +113,20 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
             </table>
           </>
         )}
+      </section>
+
+      <section className="card section-gap">
+        <h2>Föreningar och regioner</h2>
+        <p className="muted">Ändra region eller lägg till ett alternativt namn som importen ska känna igen. Befintliga alias behålls.</p>
+        <div className="table-scroll"><table>
+          <thead><tr><th>Förening</th><th>Region</th><th>Alias</th><th>Åtgärd</th></tr></thead>
+          <tbody>{(clubs ?? []).map(club => <tr key={club.id}>
+            <td><strong>{club.name}</strong></td>
+            <td><form action={updateClubRegion} className="inline-form"><input type="hidden" name="club_id" value={club.id}/><select name="region_id" required defaultValue={club.region_id ?? ''}><option value="" disabled>Välj region</option>{(regions ?? []).map(r => <option key={r.id} value={r.id}>{r.name}</option>)}</select><button type="submit">Spara</button></form></td>
+            <td>{(club.aliases ?? []).length ? (club.aliases ?? []).join(', ') : '–'}</td>
+            <td><form action={addClubAlias} className="inline-form"><input type="hidden" name="club_id" value={club.id}/><input name="alias" required placeholder="Nytt föreningsalias"/><button type="submit">Lägg till</button></form></td>
+          </tr>)}</tbody>
+        </table></div>
       </section>
 
       <section className="card section-gap">

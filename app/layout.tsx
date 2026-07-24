@@ -3,7 +3,7 @@ import Link from 'next/link';
 
 export const metadata = {
   title: 'Regioncup Skidskytte',
-  description: 'Cupställning och tävlingsresultat för regionalt skidskytte',
+  description: 'Cupställning och tävlingsresultat för svenskt skidskytte',
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

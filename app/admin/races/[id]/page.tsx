@@ -11,6 +11,7 @@ type ReviewRow = {
   athlete_name: string;
   club_name: string;
   is_region_club: boolean;
+  region_name: string | null;
   source_place: number | null;
   region_place: number | null;
   cup_points: number | null;
@@ -59,11 +60,11 @@ export default async function RaceReviewPage({ params }: { params: Promise<{ id:
 
     <section className="card section-gap">
       <h2>Importerade resultat och poäng</h2>
-      <p className="muted">Originalplacering är placeringen från BiathlonTiming. Regionplacering räknas om efter att klubbar utanför Region Syd tagits bort.</p>
+      <p className="muted">Originalplacering är placeringen från BiathlonTiming. Cupplacering räknas inom cupens omfattning: hela Sverige för nationella cuper eller vald region för regionala cuper.</p>
       <div className="table-scroll"><table>
-        <thead><tr><th>Klass</th><th>Startnr</th><th>Åkare</th><th>Klubb</th><th>Status</th><th>Original</th><th>Region</th><th>Poäng</th><th>Skytte</th><th>Tid</th><th>Kontroll</th></tr></thead>
+        <thead><tr><th>Klass</th><th>Startnr</th><th>Åkare</th><th>Klubb</th><th>Status</th><th>Original</th><th>Cupplac.</th><th>Poäng</th><th>Skytte</th><th>Tid</th><th>Kontroll</th></tr></thead>
         <tbody>{reviewRows.map(row => <tr key={row.result_id} className={row.review_warning ? 'review-warning' : ''}>
-          <td>{row.class_name}</td><td>{row.bib ?? '–'}</td><td><strong>{row.athlete_name}</strong></td><td>{row.club_name}</td>
+          <td>{row.class_name}</td><td>{row.bib ?? '–'}</td><td><strong>{row.athlete_name}</strong></td><td>{row.club_name}{row.region_name ? <span className="muted"> · {row.region_name}</span> : null}</td>
           <td>{row.result_status}</td><td>{row.source_place ?? '–'}</td><td>{row.region_place ?? '–'}</td><td><strong>{row.cup_points ?? 0}</strong></td>
           <td>{row.shooting_shots ? `${row.shooting_hits}/${row.shooting_shots}` : '–'}</td><td>{timeLabel(row.total_time_ms)}</td><td>{row.review_warning ?? 'OK'}</td>
         </tr>)}</tbody>

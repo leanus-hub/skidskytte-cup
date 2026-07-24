@@ -1,21 +1,23 @@
-# Region Syd Skidskytte Cup – version 6.0
+# Biathlon Cup v6.3 – förbättrad sammanställning
 
-Ren installation med globala klasser och klubbar.
+Bygger vidare på den regionala v6.2-strukturen.
+
+## Nytt på den publika sammanställningen
+
+- Klickbara regioner
+- Dashboard per cup med unika åkare, deltävlingar, klubbar och regionala starter
+- Ledare i poängligan och medaljligan direkt i dashboarden
+- Separata klubbflikar för Poängliga och Medaljliga
+- Cupstatistik med deltagande per tävling
+- Rekord för mest/minst besökta tävling, flest starter per klubb, klass och åkare
+- Högsta poängsnitt för åkare
+- Bästa klubb mätt i poäng per start
+- Tabeller för starter per klubb och klass
 
 ## Installation
 
-1. Öppna Supabase → SQL Editor.
-2. Kör hela `supabase/INSTALL_V6_RESET.sql` på en gång.
-3. Kontrollera att sista resultatet visar `classes = 13`, `results = 0` och `classes_has_cup_id = 0`.
-4. Kontrollera att din användare fortfarande har `is_admin = true` i tabellen `profiles`.
-5. Ersätt filerna i GitHub med innehållet i denna ZIP.
-6. Vänta tills Vercel har driftsatt och skapa sedan cup och tävlingar på nytt.
-7. Importera och granska varje tävling innan publicering.
+1. Databasen ska först vara migrerad till v6.2 regional-only.
+2. Kör `supabase/MIGRATE_V6_3_SUMMARY_INSIGHTS.sql` i Supabase SQL Editor.
+3. Lägg upp projektfilerna i GitHub och distribuera via Vercel.
 
-## Viktigt
-
-- SQL-filen raderar all tidigare cupdata men bevarar Supabase Auth-användare och befintliga profil/adminrader.
-- Klasser är globala och tabellen `classes` har ingen `cup_id`.
-- Klubbar är globala och återanvänds i alla cuper.
-- Okända klasser stoppar importen tills ett klassalias har lagts till i admin.
-- Okända klubbar skapas som externa (`is_region_club = false`) och ger inga poäng förrän de har godkänts i databasen.
+Migreringen skapar endast statistikvyn `cup_race_statistics`. Den rensar inte klasser, klassalias, klubbalias, tävlingar eller resultat.

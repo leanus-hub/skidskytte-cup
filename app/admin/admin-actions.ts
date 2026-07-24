@@ -43,8 +43,9 @@ export async function createCup(formData: FormData) {
   const seasonId = text(formData, 'season_id');
   const name = text(formData, 'name');
   const cupType = text(formData, 'cup_type');
+  const regionId = text(formData, 'region_id');
 
-  if (!seasonId || !name || !['sommar', 'vinter'].includes(cupType)) {
+  if (!seasonId || !name || !['sommar', 'vinter'].includes(cupType) || !regionId) {
     redirect('/admin?error=cup-fields');
   }
 
@@ -52,6 +53,8 @@ export async function createCup(formData: FormData) {
     season_id: seasonId,
     name,
     cup_type: cupType,
+    competition_scope: 'region',
+    region_id: regionId,
     min_races_for_prize: 3,
     active: true,
   });
@@ -165,6 +168,32 @@ export async function addClassAlias(formData: FormData) {
   redirect('/admin?success=class-alias-added');
 }
 
+export async function updateClubRegion(formData: FormData) {
+  const supabase = await requireAdmin();
+  const clubId = text(formData, 'club_id');
+  const regionId = text(formData, 'region_id');
+  if (!clubId || !regionId) redirect('/admin?error=club-region-fields');
+  const { error } = await supabase.from('clubs').update({ region_id: regionId }).eq('id', clubId);
+  if (error) redirect(`/admin?error=${encodeURIComponent(error.message)}`);
+  revalidatePath('/');
+  revalidatePath('/admin');
+  redirect('/admin?success=club-region-updated');
+}
+
+export async function addClubAlias(formData: FormData) {
+  const supabase = await requireAdmin();
+  const clubId = text(formData, 'club_id');
+  const alias = text(formData, 'alias');
+  if (!clubId || !alias) redirect('/admin?error=club-alias-fields');
+  const { data: club, error: readError } = await supabase.from('clubs').select('id,name,aliases').eq('id', clubId).single();
+  if (readError || !club) redirect('/admin?error=club-not-found');
+  const aliases = Array.from(new Set([...(club.aliases ?? []), alias])).filter(value => normalizeName(value) !== normalizeName(club.name));
+  const { error } = await supabase.from('clubs').update({ aliases }).eq('id', clubId);
+  if (error) redirect(`/admin?error=${encodeURIComponent(error.message)}`);
+  revalidatePath('/admin');
+  redirect('/admin?success=club-alias-added');
+}
+
 export async function importRaceResults(formData: FormData) {
   const supabase = await requireAdmin();
   const databaseRaceId = text(formData, 'race_id');
@@ -185,8 +214,8 @@ export async function importRaceResults(formData: FormData) {
   let outsideCountForRedirect = 0;
   try {
     const imported = await importBiathlonTiming(race.external_race_id, race.source_url);
-    const { data: clubs } = await supabase.from('clubs').select('id,name,short_name,aliases,is_region_club,active');
-    type ClubRow = { id: string; name: string; short_name: string | null; aliases: string[] | null; is_region_club: boolean; active: boolean };
+    const { data: clubs } = await supabase.from('clubs').select('id,name,short_name,aliases,region_id,active');
+    type ClubRow = { id: string; name: string; short_name: string | null; aliases: string[] | null; region_id: string | null; active: boolean };
     const clubMap = new Map<string, ClubRow>();
     for (const club of clubs ?? []) {
       for (const alias of [club.name, club.short_name, ...(club.aliases ?? [])]) {
@@ -237,18 +266,18 @@ export async function importRaceResults(formData: FormData) {
       if (!club) {
         const { data: createdClub, error } = await supabase
           .from('clubs')
-          .insert({ name: row.clubName, short_name: row.clubName, aliases: [row.clubName], active: true, is_region_club: false })
-          .select('id,name,short_name,aliases,is_region_club,active')
+          .insert({ name: row.clubName, short_name: row.clubName, aliases: [row.clubName], active: true, region_id: null })
+          .select('id,name,short_name,aliases,region_id,active')
           .single();
         if (error?.code === '23505') {
-          const { data: existing } = await supabase.from('clubs').select('id,name,short_name,aliases,is_region_club,active').eq('name', row.clubName).single();
+          const { data: existing } = await supabase.from('clubs').select('id,name,short_name,aliases,region_id,active').eq('name', row.clubName).single();
           club = existing ?? undefined;
         } else if (error) throw error;
         else club = createdClub;
         if (club) clubMap.set(clubKey, club);
       }
       if (!club) throw new Error(`Klubben ${row.clubName} kunde inte sparas.`);
-      if (!club.is_region_club) outsideClubCount += 1;
+      if (!club.region_id) outsideClubCount += 1;
 
       const athleteKey = `${normalizeName(row.athleteName)}|${club.id}`;
       let athleteId = athleteCache.get(athleteKey);
