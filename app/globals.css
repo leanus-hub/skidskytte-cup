@@ -185,3 +185,6 @@ th { background: #edf3fb; color: var(--accent-dark); }
 .alias-box { padding:12px; background:var(--accent-soft); border-radius:10px; color:var(--accent-dark); }
 .admin-workspace hr { border:0; border-top:1px solid var(--border); margin:24px 0; }
 @media (max-width:800px){ .admin-club-layout{grid-template-columns:1fr;} .club-picker{position:static;} .form-columns{grid-template-columns:1fr;} }
+
+.club-picker select { width: 100%; margin-bottom: 1rem; }
+.club-count { margin-top: .25rem; }

@@ -1,7 +1,8 @@
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
-import { addClassAlias, addClubAlias, createCup, createRace, createSeason, importRaceResults, logout, setRaceStatus, updateClubRegion } from './admin-actions';
+import { addClassAlias, createCup, createRace, createSeason, importRaceResults, logout, setRaceStatus } from './admin-actions';
+import ClubManager from './club-manager';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,14 +33,12 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   ]);
 
   const selectedRegionId = params.region ?? regions?.[0]?.id ?? '';
-  let clubs: {id:string;name:string;short_name:string|null;aliases:string[]|null;region_id:string|null;regions:RelatedName}[] = [];
+  let clubs: {id:string;name:string;short_name:string|null;aliases:string[]|null;region_id:string|null}[] = [];
   if (section === 'clubs') {
-    let query = supabase.from('clubs').select('id,name,short_name,aliases,region_id,regions(name)').order('name');
-    if (selectedRegionId) query = query.eq('region_id', selectedRegionId);
-    const { data } = await query;
-    clubs = (data ?? []) as typeof clubs;
+    const { data, error } = await supabase.from('clubs').select('id,name,short_name,aliases,region_id').eq('active', true).order('name');
+    if (error) throw new Error(`Kunde inte läsa föreningar: ${error.message}`);
+    clubs = data ?? [];
   }
-  const selectedClub = clubs.find(club => club.id === params.club) ?? clubs[0];
 
   const nav = [
     ['home','Översikt'], ['season','Ny säsong'], ['cup','Ny cup'], ['race','Koppla tävling'],
@@ -91,13 +90,12 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       <label htmlFor="class_alias">Nytt alias</label><input id="class_alias" name="alias" required placeholder="Pojkar 10-11 Massstart" /><button type="submit">Lägg till alias</button></form>
       <div className="table-scroll"><table><thead><tr><th>Klass</th><th>Alias</th></tr></thead><tbody>{(classes??[]).map(c=><tr key={c.id}><td><strong>{c.name}</strong></td><td>{(c.aliases??[]).join(', ')||'–'}</td></tr>)}</tbody></table></div></section>}
 
-    {section === 'clubs' && <section className="admin-club-layout">
-      <aside className="card club-picker"><h2>Regioner & föreningar</h2><form method="get"><input type="hidden" name="section" value="clubs"/><label htmlFor="club_region">Region</label><select id="club_region" name="region" defaultValue={selectedRegionId}>{(regions??[]).map(r=><option key={r.id} value={r.id}>{r.name}</option>)}</select><button type="submit">Visa föreningar</button></form>
-      <div className="club-list">{clubs.map(club=><Link key={club.id} className={club.id===selectedClub?.id?'active':''} href={adminHref('clubs',{region:selectedRegionId,club:club.id})}>{club.name}</Link>)}</div></aside>
-      <section className="card admin-workspace">{selectedClub ? <><p className="eyebrow dark">Redigera förening</p><h2>{selectedClub.name}</h2><p className="muted">Nuvarande region: {relatedName(selectedClub.regions)}</p>
-        <form action={updateClubRegion}><input type="hidden" name="club_id" value={selectedClub.id}/><input type="hidden" name="return_region" value={selectedRegionId}/><label htmlFor="edit_region">Byt region</label><select id="edit_region" name="region_id" required defaultValue={selectedClub.region_id??''}>{(regions??[]).map(r=><option key={r.id} value={r.id}>{r.name}</option>)}</select><button type="submit">Spara region</button></form>
-        <hr/><h3>Föreningsalias</h3><p className="alias-box">{(selectedClub.aliases??[]).join(', ')||'Inga alias ännu'}</p><form action={addClubAlias}><input type="hidden" name="club_id" value={selectedClub.id}/><input type="hidden" name="return_region" value={selectedRegionId}/><label htmlFor="club_alias">Nytt alias</label><input id="club_alias" name="alias" required placeholder="Alternativt föreningsnamn"/><button type="submit">Lägg till alias</button></form></> : <p>Inga föreningar hittades i regionen.</p>}</section>
-    </section>}
+    {section === 'clubs' && <ClubManager
+      regions={regions ?? []}
+      clubs={clubs}
+      initialRegionId={selectedRegionId}
+      initialClubId={params.club}
+    />}
 
     {section === 'import' && <section className="card admin-workspace"><h2>Import & publicering</h2><div className="import-list">{(races??[]).map(r=><article className="import-card" key={r.id}><div><strong>{r.name}</strong><p className="muted import-meta">{relatedName(r.cups as RelatedName)} · {r.race_date??'Datum saknas'}</p><span className="badge">{r.import_status==='imported'?`${r.imported_result_count} importerade`:r.import_status==='failed'?'Importfel':'Inte importerad'}</span>{r.import_error&&<p className="error-text">{r.import_error}</p>}</div><div className="import-actions"><form action={importRaceResults}><input type="hidden" name="race_id" value={r.id}/><button type="submit">Importera</button></form><form action={setRaceStatus}><input type="hidden" name="race_id" value={r.id}/><input type="hidden" name="status" value={r.status==='published'?'draft':'published'}/><button className="secondary-dark" type="submit">{r.status==='published'?'Avpublicera':'Publicera'}</button></form></div></article>)}</div></section>}
   </>;
