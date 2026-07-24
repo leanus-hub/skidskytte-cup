@@ -27,13 +27,13 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     supabase.from('cups').select('id,name,cup_type,region_id,season_id').order('created_at', { ascending: false }),
     supabase.from('races').select('id,name,race_date,status,cup_id,source_url,import_status,import_error,imported_result_count,imported_at,import_warnings').order('race_date', { ascending: false }),
     supabase.from('classes').select('id,name,aliases').eq('is_official', true).order('sort_order').order('name'),
-    supabase.from('regions').select('id,name').eq('active', true).order('sort_order'),
+    supabase.from('regions').select('id,name').order('sort_order'),
   ]);
 
   const selectedRegionId = params.region ?? regions?.[0]?.id ?? '';
   let clubs: {id:string;name:string;short_name:string|null;aliases:string[]|null;region_id:string|null}[] = [];
   if (section === 'clubs') {
-    const { data, error } = await supabase.from('clubs').select('id,name,short_name,aliases,region_id').eq('active', true).order('name');
+    const { data, error } = await supabase.from('clubs').select('id,name,short_name,aliases,region_id').order('name');
     if (error) throw new Error(`Kunde inte läsa föreningar: ${error.message}`);
     clubs = data ?? [];
   }
