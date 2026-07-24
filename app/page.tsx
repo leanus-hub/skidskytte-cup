@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 export const dynamic = 'force-dynamic';
 
 type Region = { id:string; name:string; sort_order:number };
-type Cup = { id:string; name:string; season_id:string; region_id:string; regions:{name:string}|null };
+type Cup = { id:string; name:string; season_id:string; region_id:string|null };
 type Standing = {
   cup_id: string; cup_name: string; season_name: string; class_id: string; class_name: string;
   athlete_id: string; athlete_name: string; club_name: string; cup_place: number; total_points: number;
@@ -34,9 +34,9 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const view = ['individual','class','club','statistics'].includes(params.view ?? '') ? params.view! : 'individual';
   const clubView = params.clubView === 'medals' ? 'medals' : 'points';
   const supabase = await createClient();
-  const [{data:regionRows},{data:cupRows},{data:standings,error},{data:breakdown},{data:classRows},{data:clubRows},{data:raceStats}] = await Promise.all([
+  const [{data:regionRows,error:regionsError},{data:cupRows,error:cupsError},{data:standings,error},{data:breakdown},{data:classRows},{data:clubRows},{data:raceStats}] = await Promise.all([
     supabase.from('regions').select('id,name,sort_order').order('sort_order'),
-    supabase.from('cups').select('id,name,season_id,region_id,regions(name)').order('created_at'),
+    supabase.from('cups').select('id,name,season_id,region_id').order('created_at'),
     supabase.from('cup_standings').select('*').order('cup_name').order('class_name').order('cup_place'),
     supabase.from('cup_result_breakdown').select('cup_id,class_id,athlete_id,race_id,race_name,region_place,cup_points,shooting_hits,shooting_shots,is_counted').order('race_date').order('sort_order'),
     supabase.from('cup_class_standings').select('*').order('cup_name').order('class_name'),
@@ -51,30 +51,44 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const classes = (classRows ?? []) as ClassStanding[];
   const clubs = (clubRows ?? []) as ClubStanding[];
   const statistics = (raceStats ?? []) as RaceStatistic[];
-  const availableRegionIds = new Set(cups.map(c=>c.region_id));
-  const availableRegions = regions.filter(r=>availableRegionIds.has(r.id));
-  const selectedRegionId = availableRegions.some(r=>r.id===params.region) ? params.region! : availableRegions[0]?.id;
-  const selectedRegion = availableRegions.find(r=>r.id===selectedRegionId);
-  const visibleCups = cups.filter(c=>c.region_id===selectedRegionId);
-  const cupIds = visibleCups.map(c=>c.id);
+  const regionWithCup = regions.find(region => cups.some(cup => cup.region_id === region.id));
+  const selectedRegionId = regions.some(region => region.id === params.region)
+    ? params.region!
+    : regionWithCup?.id ?? regions[0]?.id;
+  const selectedRegion = regions.find(region => region.id === selectedRegionId);
+  const regionCups = cups.filter(cup => cup.region_id === selectedRegionId);
+  const selectedCupId = regionCups.some(cup => cup.id === params.cup)
+    ? params.cup!
+    : regionCups[0]?.id;
+  const visibleCups = regionCups.filter(cup => cup.id === selectedCupId);
+  const cupIds = visibleCups.map(cup => cup.id);
 
   return <>
     <section className="hero"><p className="eyebrow">Svenskt skidskytte</p><h1>Cupsammanställning</h1><p>Välj region och utforska individuella resultat, klasser, klubbarnas ligor och statistik från cupens deltävlingar.</p></section>
 
-    {availableRegions.length > 0 && <>
+    {regions.length > 0 && <>
       <h2 className="filter-heading">Välj region</h2>
       <nav className="region-tabs" aria-label="Regioner">
-        {availableRegions.map(region=><Link key={region.id} className={region.id===selectedRegionId?'active':''} href={href({region:region.id,view,clubView:view==='club'?clubView:undefined})}>{region.name}</Link>)}
+        {regions.map(region=><Link key={region.id} className={region.id===selectedRegionId?'active':''} href={href({region:region.id,view,clubView:view==='club'?clubView:undefined})}>{region.name}</Link>)}
+      </nav>
+    </>}
+
+
+    {regionCups.length > 0 && <>
+      <h2 className="filter-heading">Välj cup</h2>
+      <nav className="region-tabs" aria-label="Cuper">
+        {regionCups.map(cup=><Link key={cup.id} className={cup.id===selectedCupId?'active':''} href={href({region:selectedRegionId,cup:cup.id,view,clubView:view==='club'?clubView:undefined})}>{cup.name}</Link>)}
       </nav>
     </>}
 
     <nav className="summary-tabs" aria-label="Sammanställning">
-      <Link className={view==='individual'?'active':''} href={href({region:selectedRegionId,view:'individual'})}>Individuellt</Link>
-      <Link className={view==='class'?'active':''} href={href({region:selectedRegionId,view:'class'})}>Klasser</Link>
-      <Link className={view==='club'?'active':''} href={href({region:selectedRegionId,view:'club',clubView})}>Klubbar</Link>
-      <Link className={view==='statistics'?'active':''} href={href({region:selectedRegionId,view:'statistics'})}>Cupstatistik</Link>
+      <Link className={view==='individual'?'active':''} href={href({region:selectedRegionId,cup:selectedCupId,view:'individual'})}>Individuellt</Link>
+      <Link className={view==='class'?'active':''} href={href({region:selectedRegionId,cup:selectedCupId,view:'class'})}>Klasser</Link>
+      <Link className={view==='club'?'active':''} href={href({region:selectedRegionId,cup:selectedCupId,view:'club',clubView})}>Klubbar</Link>
+      <Link className={view==='statistics'?'active':''} href={href({region:selectedRegionId,cup:selectedCupId,view:'statistics'})}>Cupstatistik</Link>
     </nav>
 
+    {(regionsError || cupsError) && <div className="card"><h2>Regioner eller cuper kunde inte hämtas</h2><p className="muted">{regionsError?.message ?? cupsError?.message}</p></div>}
     {error && <div className="card"><h2>Poängmotorn är inte aktiverad</h2><p className="muted">Kör SQL-migreringen för version 6.3 i Supabase.</p></div>}
     {!error && cupIds.length===0 && <div className="card"><h2>Inga cuper för {selectedRegion?.name ?? 'vald region'}</h2></div>}
 
@@ -120,8 +134,8 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
 
         {view==='club' && <>
           <nav className="sub-tabs" aria-label="Klubbliga">
-            <Link className={clubView==='points'?'active':''} href={href({region:selectedRegionId,view:'club',clubView:'points'})}>Poängliga</Link>
-            <Link className={clubView==='medals'?'active':''} href={href({region:selectedRegionId,view:'club',clubView:'medals'})}>Medaljliga</Link>
+            <Link className={clubView==='points'?'active':''} href={href({region:selectedRegionId,cup:selectedCupId,view:'club',clubView:'points'})}>Poängliga</Link>
+            <Link className={clubView==='medals'?'active':''} href={href({region:selectedRegionId,cup:selectedCupId,view:'club',clubView:'medals'})}>Medaljliga</Link>
           </nav>
           {clubView==='points' && <section className="card standings-card"><h3>Klubbarnas poängliga</h3><p className="table-note">Placering efter total cup-poäng. Träffprocent används som skiljekriterium.</p><div className="table-scroll"><table><thead><tr><th>Plats</th><th>Klubb</th><th>Aktiva</th><th>Poäng</th><th>Starter</th><th>Skytte</th></tr></thead><tbody>{clubs.filter(r=>r.cup_id===cupId).sort((a,b)=>a.club_place-b.club_place).map(row=><tr key={row.club_id}><td><strong>{row.club_place}</strong></td><td><strong>{row.club_name}</strong></td><td>{row.athlete_count}</td><td><strong>{row.total_points}</strong></td><td>{row.total_starts}</td><td>{row.shooting_hits}/{row.shooting_shots} · {pct(row.shooting_percentage)}</td></tr>)}</tbody></table></div></section>}
           {clubView==='medals' && <section className="card standings-card"><h3>Klubbarnas medaljliga</h3><p className="table-note">Placering efter flest guld, därefter silver och brons.</p><div className="table-scroll"><table><thead><tr><th>Plats</th><th>Klubb</th><th>🥇 Guld</th><th>🥈 Silver</th><th>🥉 Brons</th><th>Totalt</th></tr></thead><tbody>{clubs.filter(r=>r.cup_id===cupId).sort((a,b)=>b.gold-a.gold || b.silver-a.silver || b.bronze-a.bronze || a.club_name.localeCompare(b.club_name,'sv')).map((row,index)=><tr key={row.club_id}><td><strong>{index+1}</strong></td><td><strong>{row.club_name}</strong></td><td>{row.gold}</td><td>{row.silver}</td><td>{row.bronze}</td><td><strong>{row.medals}</strong></td></tr>)}</tbody></table></div></section>}

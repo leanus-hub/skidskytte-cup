@@ -21,3 +21,10 @@ Bygger vidare på den regionala v6.2-strukturen.
 3. Lägg upp projektfilerna i GitHub och distribuera via Vercel.
 
 Migreringen skapar endast statistikvyn `cup_race_statistics`. Den rensar inte klasser, klassalias, klubbalias, tävlingar eller resultat.
+
+## v6.3.1 – korrigering av väljare
+- Regionväljaren visar alla regioner.
+- Cupväljaren visar cuper för vald region.
+- Endast vald cup visas i sammanställningen.
+- Tog bort den onödiga inbäddade Supabase-relationen från cupfrågan.
+- Synliga felmeddelanden om regioner eller cuper inte kan hämtas.
