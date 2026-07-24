@@ -83,3 +83,7 @@ button:disabled { opacity: .45; cursor: not-allowed; }
   .import-actions { display: grid; grid-template-columns: 1fr; }
   .import-actions button, .source-button { width: 100%; text-align: center; }
 }
+
+.inline-form { display: grid; grid-template-columns: minmax(220px, 1fr) minmax(220px, 1fr) auto; align-items: end; gap: 12px; margin: 16px 0 20px; }
+.inline-form > div { display: grid; gap: 8px; }
+@media (max-width: 760px) { .inline-form { grid-template-columns: 1fr; } }

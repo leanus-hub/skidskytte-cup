@@ -24,3 +24,11 @@ Next.js/Supabase-app för Region Syds skidskyttecup.
 ## Viktigt
 
 BiathlonTiming är en extern tjänst utan dokumenterat publikt import-API för den här resultatsidan. Importören provar därför flera publika resultatsidor och avbryter med ett tydligt fel om formatet inte kan tolkas. Den publicerar aldrig tävlingen automatiskt.
+
+
+## Version 4.8 – klassalias
+
+1. Kör `supabase/migrations/004_class_aliases.sql` i Supabase SQL Editor.
+2. Ladda sedan upp projektfilerna till GitHub.
+3. Importera deltävlingen igen. Klassnamn som `Pojkar 10.11` och `Pojkar 10-11 Massstart` kopplas till `Pojkar 10-11`.
+4. Fler alias kan läggas till under **Admin → Klassalias**.

@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
-import { createCup, createRace, importRaceResults, logout, setRaceStatus } from './admin-actions';
+import { addClassAlias, createCup, createRace, importRaceResults, logout, setRaceStatus } from './admin-actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,10 +13,11 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   const { data: profile } = await supabase.from('profiles').select('display_name,is_admin').eq('id', user.id).single();
   if (!profile?.is_admin) redirect('/admin/login?error=not-admin');
 
-  const [{ data: seasons }, { data: cups }, { data: races }] = await Promise.all([
+  const [{ data: seasons }, { data: cups }, { data: races }, { data: classes }] = await Promise.all([
     supabase.from('seasons').select('id,name,is_active').order('starts_on', { ascending: false }),
     supabase.from('cups').select('id,name,cup_type,season_id,seasons(name)').order('created_at', { ascending: false }),
     supabase.from('races').select('id,name,race_date,status,cup_id,source_url,import_status,import_error,imported_result_count,imported_at,import_warnings,cups(name)').order('race_date', { ascending: false }),
+    supabase.from('classes').select('id,name,aliases,cup_id,cups(name)').order('sort_order').order('name'),
   ]);
 
   return (
@@ -32,6 +33,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       {params.success === 'race-created' && <p className="alert success">Deltävlingen är tillagd som utkast.</p>}
       {params.success === 'race-published' && <p className="alert success">Deltävlingen är publicerad och ingår nu i cupställningen.</p>}
       {params.success === 'race-unpublished' && <p className="alert success">Deltävlingen är återställd till utkast.</p>}
+      {params.success === 'class-alias-added' && <p className="alert success">Klassaliaset är sparat.</p>}
       {params.success === 'results-imported' && <p className="alert success">Importen är klar: {params.count ?? '0'} resultat sparades. {Number(params.outside ?? 0) > 0 ? `${params.outside} resultat tillhör klubbar utanför Region Syd och får inga cuppoäng.` : ''}</p>}
       {params.error && <p className="alert error">Något gick fel: {params.error}</p>}
 
@@ -76,6 +78,35 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
         {(cups ?? []).length === 0 ? <p className="muted">Ingen cup skapad ännu.</p> : <table><thead><tr><th>Cup</th><th>Säsong</th><th>Typ</th></tr></thead><tbody>
           {(cups ?? []).map(c => <tr key={c.id}><td><strong>{c.name}</strong></td><td>{Array.isArray(c.seasons) ? c.seasons[0]?.name : (c.seasons as {name?:string}|null)?.name}</td><td>{c.cup_type === 'sommar' ? 'Sommar' : 'Vinter'}</td></tr>)}
         </tbody></table>}
+      </section>
+
+      <section className="card section-gap">
+        <h2>Klassalias</h2>
+        <p className="muted">Koppla alternativa klassnamn till cupens officiella klass. Importen tar även automatiskt bort tävlingsformer som Massstart, Sprint och Distans.</p>
+        {(classes ?? []).length === 0 ? (
+          <p className="muted">Klasser skapas automatiskt vid den första importen.</p>
+        ) : (
+          <>
+            <form action={addClassAlias} className="inline-form">
+              <div>
+                <label htmlFor="class_id">Officiell klass</label>
+                <select id="class_id" name="class_id" required defaultValue="">
+                  <option value="" disabled>Välj klass</option>
+                  {(classes ?? []).map(c => <option key={c.id} value={c.id}>{Array.isArray(c.cups) ? c.cups[0]?.name : (c.cups as {name?:string}|null)?.name} · {c.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label htmlFor="class_alias">Nytt alias</label>
+                <input id="class_alias" name="alias" required placeholder="Pojkar 10-11 Massstart" />
+              </div>
+              <button type="submit">Lägg till alias</button>
+            </form>
+            <table>
+              <thead><tr><th>Cup</th><th>Officiell klass</th><th>Alias</th></tr></thead>
+              <tbody>{(classes ?? []).map(c => <tr key={`class-${c.id}`}><td>{Array.isArray(c.cups) ? c.cups[0]?.name : (c.cups as {name?:string}|null)?.name}</td><td><strong>{c.name}</strong></td><td>{(c.aliases ?? []).length ? (c.aliases ?? []).join(', ') : '–'}</td></tr>)}</tbody>
+            </table>
+          </>
+        )}
       </section>
 
       <section className="card section-gap">

@@ -131,6 +131,40 @@ function normalizeName(value: string) {
     .trim();
 }
 
+function canonicalClassName(value: string) {
+  return value
+    .replace(/(\d)\s*[.–—]\s*(\d)/g, '$1-$2')
+    .replace(/\s+(massstart|sprint|distans|kortdistans|individuell|jaktstart|stafett|supersprint)(\s+.*)?$/i, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function normalizeClassName(value: string) {
+  return normalizeName(canonicalClassName(value)).replace(/\s+/g, '');
+}
+
+export async function addClassAlias(formData: FormData) {
+  const supabase = await requireAdmin();
+  const classId = text(formData, 'class_id');
+  const alias = text(formData, 'alias');
+  if (!classId || !alias) redirect('/admin?error=class-alias-fields');
+
+  const { data: classRow, error: readError } = await supabase
+    .from('classes')
+    .select('id,name,aliases')
+    .eq('id', classId)
+    .single();
+  if (readError || !classRow) redirect('/admin?error=class-not-found');
+
+  const aliases = Array.from(new Set([...(classRow.aliases ?? []), alias]))
+    .filter(value => normalizeClassName(value) !== normalizeClassName(classRow.name));
+  const { error } = await supabase.from('classes').update({ aliases }).eq('id', classId);
+  if (error) redirect(`/admin?error=${encodeURIComponent(error.message)}`);
+
+  revalidatePath('/admin');
+  redirect('/admin?success=class-alias-added');
+}
+
 export async function importRaceResults(formData: FormData) {
   const supabase = await requireAdmin();
   const databaseRaceId = text(formData, 'race_id');
@@ -160,26 +194,59 @@ export async function importRaceResults(formData: FormData) {
       }
     }
 
+    type ClassRow = { id: string; name: string; aliases: string[] | null };
+    const { data: existingClasses, error: classesError } = await supabase
+      .from('classes')
+      .select('id,name,aliases')
+      .eq('cup_id', race.cup_id);
+    if (classesError) throw classesError;
+
+    const classMap = new Map<string, ClassRow>();
+    for (const classRow of existingClasses ?? []) {
+      for (const alias of [classRow.name, ...(classRow.aliases ?? [])]) {
+        if (alias) classMap.set(normalizeClassName(alias), classRow);
+      }
+    }
+
     const classCache = new Map<string, string>();
     const athleteCache = new Map<string, string>();
     let importedCount = 0;
     let outsideClubCount = 0;
 
     for (const row of imported.results) {
-      const classKey = normalizeName(row.className);
+      const canonicalName = canonicalClassName(row.className);
+      const classKey = normalizeClassName(row.className);
       let classId = classCache.get(classKey);
       if (!classId) {
-        const { data: existingClass } = await supabase
-          .from('classes').select('id').eq('cup_id', race.cup_id).ilike('name', row.className).maybeSingle();
-        if (existingClass) classId = existingClass.id;
-        else {
+        let matchedClass = classMap.get(classKey);
+        if (!matchedClass) {
+          const aliases = canonicalName !== row.className ? [row.className] : [];
           const { data: createdClass, error } = await supabase
-            .from('classes').insert({ cup_id: race.cup_id, name: row.className }).select('id').single();
-          if (error) throw error;
-          classId = createdClass.id;
+            .from('classes')
+            .insert({ cup_id: race.cup_id, name: canonicalName, aliases })
+            .select('id,name,aliases')
+            .single();
+          if (error?.code === '23505') {
+            const { data: existingClass, error: existingError } = await supabase
+              .from('classes').select('id,name,aliases')
+              .eq('cup_id', race.cup_id).eq('name', canonicalName).single();
+            if (existingError) throw existingError;
+            matchedClass = existingClass;
+          } else if (error) throw error;
+          else matchedClass = createdClass;
+        } else if (row.className !== matchedClass.name && !(matchedClass.aliases ?? []).includes(row.className)) {
+          const aliases = Array.from(new Set([...(matchedClass.aliases ?? []), row.className]));
+          const { error: aliasError } = await supabase.from('classes').update({ aliases }).eq('id', matchedClass.id);
+          if (aliasError) throw aliasError;
+          matchedClass = { ...matchedClass, aliases };
         }
-        if (!classId) throw new Error(`Klassen ${row.className} kunde inte sparas.`);
-        classCache.set(classKey, classId);
+
+        if (!matchedClass) throw new Error(`Klassen ${row.className} kunde inte sparas.`);
+        classId = matchedClass.id;
+        for (const alias of [matchedClass.name, ...(matchedClass.aliases ?? []), row.className]) {
+          classMap.set(normalizeClassName(alias), matchedClass);
+          classCache.set(normalizeClassName(alias), matchedClass.id);
+        }
       }
       if (!classId) throw new Error(`Klassen ${row.className} saknar id.`);
 
