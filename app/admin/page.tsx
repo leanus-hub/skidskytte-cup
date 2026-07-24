@@ -17,7 +17,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     supabase.from('seasons').select('id,name,is_active').order('starts_on', { ascending: false }),
     supabase.from('cups').select('id,name,cup_type,season_id,seasons(name)').order('created_at', { ascending: false }),
     supabase.from('races').select('id,name,race_date,status,cup_id,source_url,import_status,import_error,imported_result_count,imported_at,import_warnings,cups(name)').order('race_date', { ascending: false }),
-    supabase.from('classes').select('id,name,aliases,cup_id,cups(name)').order('sort_order').order('name'),
+    supabase.from('classes').select('id,name,aliases,cup_id,cups(name)').eq('is_official', true).order('sort_order').order('name'),
   ]);
 
   return (
@@ -82,9 +82,9 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
 
       <section className="card section-gap">
         <h2>Klassalias</h2>
-        <p className="muted">Koppla alternativa klassnamn till cupens officiella klass. Importen tar även automatiskt bort tävlingsformer som Massstart, Sprint och Distans.</p>
+        <p className="muted">Koppla alternativa klassnamn till cupens officiella klass. Tävlingsformer som Massstart, Sprint och Distans normaliseras bort. Okända klassnamn måste först läggas till som alias.</p>
         {(classes ?? []).length === 0 ? (
-          <p className="muted">Klasser skapas automatiskt vid den första importen.</p>
+          <p className="muted">Kör databasmigreringen för att skapa cupens officiella klasser.</p>
         ) : (
           <>
             <form action={addClassAlias} className="inline-form">
