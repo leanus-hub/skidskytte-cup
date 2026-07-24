@@ -1,0 +1,41 @@
+:root {
+  color-scheme: light;
+  --bg: #f3f6f4;
+  --card: #ffffff;
+  --text: #17221e;
+  --muted: #64716c;
+  --border: #dbe4df;
+  --accent: #166348;
+  --accent-dark: #0d4431;
+}
+* { box-sizing: border-box; }
+html { min-height: 100%; }
+body { margin: 0; min-height: 100vh; font-family: Arial, Helvetica, sans-serif; background: var(--bg); color: var(--text); }
+a { color: inherit; text-decoration: none; }
+header { background: var(--accent-dark); color: white; padding: 17px 0; }
+.header-inner { display: flex; justify-content: space-between; align-items: center; gap: 20px; }
+.brand { font-weight: 800; letter-spacing: -.02em; }
+nav { display: flex; gap: 20px; font-size: .95rem; }
+.wrap { width: min(1080px, calc(100% - 32px)); margin: 0 auto; }
+main { padding: 34px 0 64px; min-height: calc(100vh - 137px); }
+.hero { padding: 34px; background: linear-gradient(135deg, #164b39, #23815f); color: white; border-radius: 20px; margin-bottom: 22px; }
+.hero h1 { font-size: clamp(2rem, 5vw, 3.3rem); margin: 4px 0 10px; letter-spacing: -.04em; }
+.hero p { max-width: 650px; line-height: 1.6; margin-bottom: 0; }
+.eyebrow { text-transform: uppercase; letter-spacing: .14em; font-size: .75rem; font-weight: 800; opacity: .8; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 15px; padding: 22px; box-shadow: 0 5px 20px rgba(15, 40, 30, .05); overflow-x: auto; }
+.card h2 { margin-top: 0; }
+.muted { color: var(--muted); line-height: 1.55; }
+.status { font-weight: 700; display: flex; align-items: center; gap: 9px; }
+.status span { width: 10px; height: 10px; border-radius: 50%; background: #2a9b68; box-shadow: 0 0 0 4px #dff3e9; }
+table { width: 100%; border-collapse: collapse; background: white; }
+th, td { padding: 12px; border-bottom: 1px solid var(--border); text-align: left; white-space: nowrap; }
+th { background: #eaf1ed; }
+input, button, select { font: inherit; padding: 12px; border-radius: 9px; border: 1px solid #b9c8c0; }
+input:focus { outline: 3px solid #d8eee4; border-color: var(--accent); }
+button { background: var(--accent); color: white; border: 0; cursor: pointer; font-weight: 800; }
+button:hover { background: var(--accent-dark); }
+form { display: grid; gap: 12px; }
+label { font-weight: 700; }
+footer { border-top: 1px solid var(--border); color: var(--muted); padding: 20px 0; font-size: .9rem; }
+@media (max-width: 600px) { .header-inner { align-items: flex-start; flex-direction: column; } .hero { padding: 25px; } }
