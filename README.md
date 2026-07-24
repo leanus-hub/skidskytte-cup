@@ -29,3 +29,7 @@ BiathlonTiming är en extern tjänst utan dokumenterat publikt import-API för d
 ## Version 4.9 – officiella klasser
 
 Migrationen `004_class_aliases.sql` skapar den fasta klasslistan från Region Syd Cup Sommar 2026. Importen skapar inte längre nya klasser automatiskt. Ett okänt klassnamn stoppas och måste läggas till som alias i admin innan importen körs igen.
+
+
+## Version 5.0
+Kör även `supabase/migrations/005_summary_views_and_race_review.sql`. Versionen lägger till sammanställning för individ, klass och klubb samt granskningssida för importerade tävlingsresultat i admin.

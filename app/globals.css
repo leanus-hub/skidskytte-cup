@@ -87,3 +87,9 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .inline-form { display: grid; grid-template-columns: minmax(220px, 1fr) minmax(220px, 1fr) auto; align-items: end; gap: 12px; margin: 16px 0 20px; }
 .inline-form > div { display: grid; gap: 8px; }
 @media (max-width: 760px) { .inline-form { grid-template-columns: 1fr; } }
+
+.summary-tabs { display:flex; gap:.5rem; flex-wrap:wrap; margin:1.25rem 0 2rem; }
+.summary-tabs a { padding:.75rem 1rem; border-radius:999px; background:#fff; border:1px solid rgba(15,23,42,.15); text-decoration:none; color:inherit; font-weight:700; }
+.summary-tabs a.active { background:#173d2b; color:#fff; border-color:#173d2b; }
+.table-scroll { overflow-x:auto; }
+.review-warning { background:#fff4e5; }
