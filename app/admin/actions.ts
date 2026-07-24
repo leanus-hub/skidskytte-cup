@@ -101,3 +101,20 @@ export async function createRace(formData: FormData) {
   revalidatePath('/admin');
   redirect('/admin?success=race-created');
 }
+
+export async function setRaceStatus(formData: FormData) {
+  const supabase = await requireAdmin();
+  const raceId = text(formData, 'race_id');
+  const status = text(formData, 'status');
+
+  if (!raceId || !['draft', 'published'].includes(status)) {
+    redirect('/admin?error=invalid-race-status');
+  }
+
+  const { error } = await supabase.from('races').update({ status }).eq('id', raceId);
+  if (error) redirect(`/admin?error=${encodeURIComponent(error.message)}`);
+
+  revalidatePath('/');
+  revalidatePath('/admin');
+  redirect(`/admin?success=${status === 'published' ? 'race-published' : 'race-unpublished'}`);
+}

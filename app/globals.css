@@ -53,3 +53,18 @@ button.secondary:hover { background: rgba(255,255,255,.25); }
 .badge { display: inline-block; background: #eaf1ed; border-radius: 999px; padding: 5px 9px; font-size: .83rem; font-weight: 700; }
 .text-link { color: var(--accent); font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
 @media (max-width: 600px) { .hero-row { align-items: flex-start; flex-direction: column; } }
+.cup-section { margin-top: 28px; }
+.section-heading { display: flex; justify-content: space-between; align-items: end; margin: 0 2px 12px; }
+.section-heading h2 { margin: 2px 0 0; font-size: 1.7rem; }
+.eyebrow.dark { color: var(--accent); opacity: 1; margin: 0; }
+.standings-card { margin-bottom: 16px; }
+.standings-card h3 { margin-top: 0; font-size: 1.25rem; }
+details summary { cursor: pointer; color: var(--accent-dark); font-weight: 800; }
+.result-detail { margin-top: 10px; min-width: 530px; padding: 10px; border: 1px solid var(--border); border-radius: 10px; background: #f8faf9; }
+.result-detail table { font-size: .88rem; }
+.result-detail th, .result-detail td { padding: 8px; }
+tr.dropped td { color: var(--muted); text-decoration: line-through; background: #f5f6f5; }
+.table-note { margin: 14px 0 0; color: var(--muted); font-size: .9rem; }
+.success-badge { background: #dff3e9; color: #14583f; }
+.small-button { padding: 8px 11px; font-size: .85rem; white-space: nowrap; }
+td form { display: inline; }

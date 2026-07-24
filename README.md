@@ -56,3 +56,21 @@ Vercels befintliga miljövariabler ska vara kvar:
 4. Lägg till en deltävling och klistra in dess BiathlonTiming-länk.
 
 Deltävlingen sparas först som **Utkast**. Nästa utvecklingssteg är att läsa själva resultatdatan, förhandsgranska klubbmatchningen och publicera cuppoängen.
+
+
+## Aktivera automatisk poängberäkning
+
+Kör hela filen `supabase/migrations/002_scoring_and_standings.sql` i Supabase SQL Editor.
+
+Poängmotorn följer Syd Cups regler:
+
+- 15, 13, 12 ... 1 poäng, och 1 poäng för övriga placeringar
+- utomstående klubbar tas bort innan regionplaceringen räknas
+- 0/1/2/3/4 strykresultat beroende på antal publicerade deltävlingar
+- minst tre starter för att vara kvalificerad för pris
+- skytteprocent på räknade tävlingar avgör vid lika totalpoäng
+- fortsatt lika poäng och skytteprocent ger delad placering
+
+Befintliga klubbar markeras som Region Syd när migrationen körs. Nya externa klubbar ska ha `is_region_club = false`.
+
+Resultat måste ha status `OK` och en placering. Skytte kan anges i kolumnerna `shooting_hits` och `shooting_shots`. Deltävlingen måste vara `published`; detta kan göras med knappen på adminsidan.
