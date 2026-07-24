@@ -71,3 +71,15 @@ td form { display: inline; }
 .action-stack { display: grid; gap: .45rem; min-width: 150px; }
 .error-text { color: #9b1c1c; max-width: 280px; overflow-wrap: anywhere; }
 button:disabled { opacity: .45; cursor: not-allowed; }
+
+.import-list { display: grid; gap: 12px; margin-top: 16px; }
+.import-card { display: flex; justify-content: space-between; align-items: center; gap: 20px; padding: 16px; border: 1px solid var(--border); border-radius: 12px; background: #f8faf9; }
+.import-meta { margin: 5px 0 9px; font-size: .92rem; }
+.import-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.import-actions form { display: block; }
+.source-button { display: inline-block; padding: 12px; border: 1px solid #b9c8c0; border-radius: 9px; color: var(--accent-dark); background: white; font-weight: 800; white-space: nowrap; }
+@media (max-width: 700px) {
+  .import-card { align-items: stretch; flex-direction: column; }
+  .import-actions { display: grid; grid-template-columns: 1fr; }
+  .import-actions button, .source-button { width: 100%; text-align: center; }
+}

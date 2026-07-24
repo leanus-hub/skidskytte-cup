@@ -1,4 +1,4 @@
-import { login } from '../actions';
+import { login } from '../admin-actions';
 
 export default async function AdminLoginPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const params = await searchParams;

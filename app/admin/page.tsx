@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
-import { createCup, createRace, importRaceResults, logout, setRaceStatus } from './actions';
+import { createCup, createRace, importRaceResults, logout, setRaceStatus } from './admin-actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -79,7 +79,35 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       </section>
 
       <section className="card section-gap">
-        <h2>Deltävlingar</h2>
+        <h2>3. Importera resultat</h2>
+        <p className="muted">Välj en deltävling och hämta resultaten från BiathlonTiming. När importen lyckats kan tävlingen publiceras.</p>
+        {(races ?? []).length === 0 ? (
+          <p className="muted">Lägg först till en deltävling.</p>
+        ) : (
+          <div className="import-list">
+            {(races ?? []).map(r => (
+              <article className="import-card" key={`import-${r.id}`}>
+                <div>
+                  <strong>{r.name}</strong>
+                  <p className="muted import-meta">{Array.isArray(r.cups) ? r.cups[0]?.name : (r.cups as {name?:string}|null)?.name} · {r.race_date ?? 'Datum saknas'}</p>
+                  <span className="badge">{r.import_status === 'imported' ? `${r.imported_result_count} importerade` : r.import_status === 'failed' ? 'Importfel' : r.import_status === 'processing' ? 'Importerar' : 'Inte importerad'}</span>
+                  {r.import_error && <p className="error-text">{r.import_error}</p>}
+                </div>
+                <div className="import-actions">
+                  <a className="source-button" href={r.source_url} target="_blank" rel="noreferrer">Öppna resultat</a>
+                  <form action={importRaceResults}>
+                    <input type="hidden" name="race_id" value={r.id} />
+                    <button type="submit">{r.import_status === 'imported' ? 'Importera igen' : 'Importera resultat'}</button>
+                  </form>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="card section-gap">
+        <h2>Deltävlingar och publicering</h2>
         {(races ?? []).length === 0 ? <p className="muted">Ingen deltävling tillagd ännu.</p> : <table><thead><tr><th>Tävling</th><th>Cup</th><th>Datum</th><th>Status</th><th>Källa</th><th>Import</th><th>Åtgärd</th></tr></thead><tbody>
           {(races ?? []).map(r => <tr key={r.id}><td><strong>{r.name}</strong></td><td>{Array.isArray(r.cups) ? r.cups[0]?.name : (r.cups as {name?:string}|null)?.name}</td><td>{r.race_date ?? '–'}</td><td><span className="badge">{r.status === 'draft' ? 'Utkast' : r.status === 'published' ? 'Publicerad' : r.status}</span></td><td><a className="text-link" href={r.source_url} target="_blank" rel="noreferrer">Öppna resultat</a></td><td><div className="action-stack"><span className="badge">{r.import_status === 'imported' ? `${r.imported_result_count} importerade` : r.import_status === 'failed' ? 'Importfel' : r.import_status === 'processing' ? 'Importerar' : 'Inte importerad'}</span>{r.import_error && <small className="error-text">{r.import_error}</small>}<form action={importRaceResults}><input type="hidden" name="race_id" value={r.id} /><button className="small-button secondary" type="submit">{r.import_status === 'imported' ? 'Importera igen' : 'Importera resultat'}</button></form></div></td><td><form action={setRaceStatus}><input type="hidden" name="race_id" value={r.id} /><input type="hidden" name="status" value={r.status === 'published' ? 'draft' : 'published'} /><button className="small-button" type="submit" disabled={r.import_status !== 'imported'}>{r.status === 'published' ? 'Återställ' : 'Publicera'}</button></form></td></tr>)}
         </tbody></table>}
