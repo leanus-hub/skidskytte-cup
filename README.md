@@ -1,54 +1,58 @@
-# Regioncup Skidskytte – Vercel-version
+# Regioncup Skidskytte – adminversion
 
-En första säker och publicerbar grund för cupställning med Next.js och Supabase.
-Du behöver inte installera Node eller köra `npm install` på din dator.
+Den här versionen innehåller:
 
-## Publicera helt i webbläsaren
+- säker administratörsinloggning med Supabase Auth
+- skapande av sommar- och vintercuper
+- registrering av deltävlingar med BiathlonTiming-länk
+- listor över skapade cuper och deltävlingar
+- befintlig publik cupställning
 
-### 1. Återställ/skapa databasen
+## Uppdatera databasen
 
-I Supabase: öppna **SQL Editor**, skapa en ny query och klistra in hela innehållet i:
+Öppna **Supabase → SQL Editor**, klistra in hela innehållet i:
 
-`supabase/migrations/000_reset_and_setup.sql`
+`supabase/migrations/001_admin_and_cups.sql`
 
-Kör skriptet en gång. Det är avsett för det nya projektet och tar bort de halvfärdiga tabellerna från tidigare försök.
+och klicka **Run**. Skriptet behåller dina befintliga säsonger och klubbar.
 
-### 2. Lägg projektet på GitHub
+## Skapa ditt administratörskonto
 
-1. Skapa ett nytt tomt repository, exempelvis `skidskytte-cup`.
-2. Packa upp zip-filen på datorn.
-3. På GitHub-repots startsida: välj **uploading an existing file**.
-4. Dra in alla filer och mappar från den uppackade mappen.
-5. Välj **Commit changes**.
+1. Öppna **Supabase → Authentication → Users**.
+2. Klicka **Add user → Create new user**.
+3. Ange din e-postadress och ett starkt lösenord. Markera att användaren är bekräftad.
+4. Öppna SQL Editor och kör följande, med din riktiga e-postadress:
 
-`.env.local` ingår inte och inga hemliga nycklar läggs i GitHub.
+```sql
+update public.profiles p
+set is_admin = true
+from auth.users u
+where p.id = u.id
+  and u.email = 'DIN-EPOSTADRESS';
+```
 
-### 3. Importera repot till Vercel
+Kontrollera sedan:
 
-1. Välj **Add New → Project** i Vercel.
-2. Importera GitHub-repot.
-3. Framework Preset ska identifieras som **Next.js**.
-4. Lägg till miljövariablerna nedan före Deploy:
+```sql
+select u.email, p.display_name, p.is_admin
+from auth.users u
+join public.profiles p on p.id = u.id;
+```
 
-- `NEXT_PUBLIC_SUPABASE_URL` = `https://rrmhcfkykefjmyhbtmnk.supabase.co`
-- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` = din publishable key
+## Lägg upp versionen på GitHub
 
-Markera Production, Preview och Development för båda.
+Ladda upp alla filer från projektmappen till samma GitHub-repository. Välj att ersätta filer med samma namn och gör en commit. Vercel bygger och publicerar automatiskt.
 
-5. Klicka **Deploy**.
+Vercels befintliga miljövariabler ska vara kvar:
 
-Vercel installerar npm-paketen och bygger webbplatsen i molnet.
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
 
-## Nuvarande funktioner
+## Användning
 
-- Publik cupställning från Supabase.
-- Mobilanpassad webb.
-- Säker databasmodell med Row Level Security.
-- Kontroll av BiathlonTiming-länkar och `raceId`.
-- Inga hemliga servernycklar krävs i första versionen.
+1. Öppna `/admin` på webbplatsen.
+2. Logga in.
+3. Skapa exempelvis **Syd Cup Vinter 2026**.
+4. Lägg till en deltävling och klistra in dess BiathlonTiming-länk.
 
-## Nästa steg
-
-- Supabase-inloggning för administratörer.
-- Riktig import av klasser och deltagarresultat.
-- Poängregler och förhandsgranskning före publicering.
+Deltävlingen sparas först som **Utkast**. Nästa utvecklingssteg är att läsa själva resultatdatan, förhandsgranska klubbmatchningen och publicera cuppoängen.
