@@ -28,3 +28,13 @@ Migreringen skapar endast statistikvyn `cup_race_statistics`. Den rensar inte kl
 - Endast vald cup visas i sammanställningen.
 - Tog bort den onödiga inbäddade Supabase-relationen från cupfrågan.
 - Synliga felmeddelanden om regioner eller cuper inte kan hämtas.
+
+## Version 6.4 – tydligare administration och färgprofil
+
+- Ny adminstart med separata funktioner för säsong, cup, tävling, import, klassalias och föreningar.
+- Föreningsregistret visas inte längre på adminstartsidan.
+- Regionfilter och redigering av en förening i taget.
+- Separata och tydliga knappar för att spara region och lägga till föreningsalias.
+- Region- och cupval på sammanställningen använder riktiga select-komponenter i klienten.
+- Ny blå/gul färgprofil inspirerad av uttrycket på skidskytte.se.
+- Ingen ny SQL-migrering krävs från version 6.3.1.

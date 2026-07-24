@@ -127,3 +127,61 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .insight-columns { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; }
 @media (max-width:800px) { .cup-dashboard { grid-template-columns:repeat(2,minmax(0,1fr)); } .dashboard-leader { grid-column:span 1; } .insight-columns { grid-template-columns:1fr; } }
 @media (max-width:480px) { .cup-dashboard { grid-template-columns:1fr; } }
+
+/* Svenskt skidskytte-inspirerad färgprofil */
+:root {
+  --bg: #f5f7fb;
+  --card: #ffffff;
+  --text: #101b35;
+  --muted: #5d6780;
+  --border: #d9deea;
+  --accent: #1657a6;
+  --accent-dark: #0b2f63;
+  --accent-soft: #eaf2fc;
+  --yellow: #f4c430;
+  --yellow-dark: #c99a00;
+}
+body { background: linear-gradient(180deg,#f7f9fc 0,#f1f4f9 100%); }
+header { background: #0b2f63; border-bottom: 4px solid var(--yellow); }
+.hero { background: linear-gradient(135deg,#0b2f63 0%,#1657a6 72%,#2d78c5 100%); box-shadow: 0 18px 45px rgba(11,47,99,.18); }
+button { background: var(--accent); }
+button:hover { background: var(--accent-dark); }
+button.secondary-dark { background:#fff; color:var(--accent-dark); border:1px solid var(--border); }
+button.secondary-dark:hover { background:var(--accent-soft); }
+th { background: #edf3fb; color: var(--accent-dark); }
+.status span { background: var(--yellow); box-shadow: 0 0 0 4px #fff4bf; }
+.summary-tabs a.active, .region-tabs a.active, .sub-tabs a.active { background:var(--accent-dark); border-color:var(--accent-dark); }
+.dashboard-leader { background:linear-gradient(135deg,#0b2f63,#1657a6); }
+.record-card.featured, .stat-highlight { background:linear-gradient(135deg,#fff7cf,#fff); border-color:#e9ca55; }
+.eyebrow.dark, .text-link { color:var(--accent); }
+
+.selector-panel { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; background:#fff; border:1px solid var(--border); border-left:6px solid var(--yellow); padding:18px; border-radius:16px; margin:0 0 18px; box-shadow:0 8px 24px rgba(11,47,99,.07); }
+.selector-field { display:grid; gap:7px; }
+.selector-field select { width:100%; background:#fff; border-color:#aeb9cc; font-weight:700; color:var(--accent-dark); }
+@media (max-width:650px){ .selector-panel{grid-template-columns:1fr;} }
+
+.admin-tools { display:flex; flex-wrap:wrap; gap:9px; margin:0 0 18px; }
+.admin-tools a { padding:11px 15px; border-radius:10px; background:#fff; border:1px solid var(--border); color:var(--accent-dark); font-weight:800; box-shadow:0 3px 12px rgba(11,47,99,.04); }
+.admin-tools a:hover { background:var(--accent-soft); }
+.admin-tools a.active { background:var(--accent-dark); color:#fff; border-color:var(--accent-dark); box-shadow:inset 0 -4px 0 var(--yellow); }
+.admin-dashboard { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:16px; }
+.admin-action-card { background:#fff; border:1px solid var(--border); border-radius:16px; padding:22px; min-height:180px; display:block; box-shadow:0 8px 24px rgba(11,47,99,.06); transition:transform .15s ease,box-shadow .15s ease; }
+.admin-action-card:hover { transform:translateY(-2px); box-shadow:0 14px 30px rgba(11,47,99,.12); }
+.admin-action-card span { display:inline-grid; place-items:center; width:38px; height:38px; border-radius:50%; background:var(--yellow); color:var(--accent-dark); font-weight:900; }
+.admin-action-card h2 { color:var(--accent-dark); margin:18px 0 8px; }
+.admin-action-card p { color:var(--muted); line-height:1.5; margin:0; }
+.admin-workspace { max-width:880px; }
+.admin-workspace form { max-width:640px; }
+.form-columns { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+.form-columns > div { display:grid; gap:7px; }
+.check-row { display:flex; align-items:center; gap:9px; }
+.check-row input { width:auto; }
+.admin-club-layout { display:grid; grid-template-columns:minmax(260px,340px) minmax(0,1fr); gap:16px; align-items:start; }
+.club-picker { position:sticky; top:18px; overflow:visible; }
+.club-list { display:grid; gap:6px; margin-top:16px; max-height:520px; overflow:auto; padding-right:4px; }
+.club-list a { padding:10px 11px; border-radius:8px; border:1px solid transparent; color:var(--accent-dark); font-weight:700; }
+.club-list a:hover { background:var(--accent-soft); }
+.club-list a.active { background:var(--accent-dark); color:#fff; border-color:var(--accent-dark); box-shadow:inset 4px 0 0 var(--yellow); }
+.alias-box { padding:12px; background:var(--accent-soft); border-radius:10px; color:var(--accent-dark); }
+.admin-workspace hr { border:0; border-top:1px solid var(--border); margin:24px 0; }
+@media (max-width:800px){ .admin-club-layout{grid-template-columns:1fr;} .club-picker{position:static;} .form-columns{grid-template-columns:1fr;} }

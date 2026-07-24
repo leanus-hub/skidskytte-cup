@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
+import SummarySelector from './components/summary-selector';
 
 export const dynamic = 'force-dynamic';
 
@@ -66,20 +67,13 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   return <>
     <section className="hero"><p className="eyebrow">Svenskt skidskytte</p><h1>Cupsammanställning</h1><p>Välj region och utforska individuella resultat, klasser, klubbarnas ligor och statistik från cupens deltävlingar.</p></section>
 
-    {regions.length > 0 && <>
-      <h2 className="filter-heading">Välj region</h2>
-      <nav className="region-tabs" aria-label="Regioner">
-        {regions.map(region=><Link key={region.id} className={region.id===selectedRegionId?'active':''} href={href({region:region.id,view,clubView:view==='club'?clubView:undefined})}>{region.name}</Link>)}
-      </nav>
-    </>}
+    {regions.length > 0 && <SummarySelector
+      regions={regions}
+      cups={cups}
+      selectedRegionId={selectedRegionId}
+      selectedCupId={selectedCupId}
+    />}
 
-
-    {regionCups.length > 0 && <>
-      <h2 className="filter-heading">Välj cup</h2>
-      <nav className="region-tabs" aria-label="Cuper">
-        {regionCups.map(cup=><Link key={cup.id} className={cup.id===selectedCupId?'active':''} href={href({region:selectedRegionId,cup:cup.id,view,clubView:view==='club'?clubView:undefined})}>{cup.name}</Link>)}
-      </nav>
-    </>}
 
     <nav className="summary-tabs" aria-label="Sammanställning">
       <Link className={view==='individual'?'active':''} href={href({region:selectedRegionId,cup:selectedCupId,view:'individual'})}>Individuellt</Link>

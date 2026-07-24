@@ -38,6 +38,20 @@ export async function logout() {
   redirect('/admin/login');
 }
 
+
+export async function createSeason(formData: FormData) {
+  const supabase = await requireAdmin();
+  const name = text(formData, 'name');
+  const startsOn = text(formData, 'starts_on');
+  const endsOn = text(formData, 'ends_on');
+  const isActive = text(formData, 'is_active') === 'true';
+  if (!name || !startsOn || !endsOn) redirect('/admin?section=season&error=season-fields');
+  const { error } = await supabase.from('seasons').insert({ name, starts_on: startsOn, ends_on: endsOn, is_active: isActive });
+  if (error) redirect(`/admin?section=season&error=${encodeURIComponent(error.message)}`);
+  revalidatePath('/admin');
+  redirect('/admin?section=season&success=season-created');
+}
+
 export async function createCup(formData: FormData) {
   const supabase = await requireAdmin();
   const seasonId = text(formData, 'season_id');
@@ -46,7 +60,7 @@ export async function createCup(formData: FormData) {
   const regionId = text(formData, 'region_id');
 
   if (!seasonId || !name || !['sommar', 'vinter'].includes(cupType) || !regionId) {
-    redirect('/admin?error=cup-fields');
+    redirect('/admin?section=cup&error=cup-fields');
   }
 
   const { error } = await supabase.from('cups').insert({
@@ -59,9 +73,9 @@ export async function createCup(formData: FormData) {
     active: true,
   });
 
-  if (error) redirect(`/admin?error=${encodeURIComponent(error.message)}`);
+  if (error) redirect(`/admin?section=cup&error=${encodeURIComponent(error.message)}`);
   revalidatePath('/admin');
-  redirect('/admin?success=cup-created');
+  redirect('/admin?section=cup&success=cup-created');
 }
 
 export async function createRace(formData: FormData) {
@@ -77,10 +91,10 @@ export async function createRace(formData: FormData) {
     raceId = parsed.searchParams.get('raceId')?.trim() ?? '';
     if (parsed.hostname !== 'results.biathlontiming.se' || !raceId) throw new Error();
   } catch {
-    redirect('/admin?error=invalid-race-url');
+    redirect('/admin?section=race&error=invalid-race-url');
   }
 
-  if (!cupId || !name) redirect('/admin?error=race-fields');
+  if (!cupId || !name) redirect('/admin?section=race&error=race-fields');
 
   const { data: lastRace } = await supabase
     .from('races')
@@ -100,9 +114,9 @@ export async function createRace(formData: FormData) {
     status: 'draft',
   });
 
-  if (error) redirect(`/admin?error=${encodeURIComponent(error.message)}`);
+  if (error) redirect(`/admin?section=race&error=${encodeURIComponent(error.message)}`);
   revalidatePath('/admin');
-  redirect('/admin?success=race-created');
+  redirect('/admin?section=race&success=race-created');
 }
 
 export async function setRaceStatus(formData: FormData) {
@@ -119,7 +133,7 @@ export async function setRaceStatus(formData: FormData) {
 
   revalidatePath('/');
   revalidatePath('/admin');
-  redirect(`/admin?success=${status === 'published' ? 'race-published' : 'race-unpublished'}`);
+  redirect(`/admin?section=import&success=${status === 'published' ? 'race-published' : 'race-unpublished'}`);
 }
 
 function normalizeName(value: string) {
@@ -150,14 +164,14 @@ export async function addClassAlias(formData: FormData) {
   const supabase = await requireAdmin();
   const classId = text(formData, 'class_id');
   const alias = text(formData, 'alias');
-  if (!classId || !alias) redirect('/admin?error=class-alias-fields');
+  if (!classId || !alias) redirect('/admin?section=classes&error=class-alias-fields');
 
   const { data: classRow, error: readError } = await supabase
     .from('classes')
     .select('id,name,aliases')
     .eq('id', classId)
     .single();
-  if (readError || !classRow) redirect('/admin?error=class-not-found');
+  if (readError || !classRow) redirect('/admin?section=classes&error=class-not-found');
 
   const aliases = Array.from(new Set([...(classRow.aliases ?? []), alias]))
     .filter(value => normalizeClassName(value) !== normalizeClassName(classRow.name));
@@ -165,46 +179,48 @@ export async function addClassAlias(formData: FormData) {
   if (error) redirect(`/admin?error=${encodeURIComponent(error.message)}`);
 
   revalidatePath('/admin');
-  redirect('/admin?success=class-alias-added');
+  redirect('/admin?section=classes&success=class-alias-added');
 }
 
 export async function updateClubRegion(formData: FormData) {
   const supabase = await requireAdmin();
   const clubId = text(formData, 'club_id');
   const regionId = text(formData, 'region_id');
-  if (!clubId || !regionId) redirect('/admin?error=club-region-fields');
+  if (!clubId || !regionId) redirect('/admin?section=clubs&error=club-region-fields');
   const { error } = await supabase.from('clubs').update({ region_id: regionId }).eq('id', clubId);
-  if (error) redirect(`/admin?error=${encodeURIComponent(error.message)}`);
+  if (error) redirect(`/admin?section=clubs&error=${encodeURIComponent(error.message)}`);
+  const returnRegion = text(formData, 'return_region');
   revalidatePath('/');
   revalidatePath('/admin');
-  redirect('/admin?success=club-region-updated');
+  redirect(`/admin?section=clubs&region=${encodeURIComponent(returnRegion)}&club=${encodeURIComponent(clubId)}&success=club-region-updated`);
 }
 
 export async function addClubAlias(formData: FormData) {
   const supabase = await requireAdmin();
   const clubId = text(formData, 'club_id');
   const alias = text(formData, 'alias');
-  if (!clubId || !alias) redirect('/admin?error=club-alias-fields');
+  if (!clubId || !alias) redirect('/admin?section=clubs&error=club-alias-fields');
   const { data: club, error: readError } = await supabase.from('clubs').select('id,name,aliases').eq('id', clubId).single();
-  if (readError || !club) redirect('/admin?error=club-not-found');
+  if (readError || !club) redirect('/admin?section=clubs&error=club-not-found');
   const aliases = Array.from(new Set([...(club.aliases ?? []), alias])).filter(value => normalizeName(value) !== normalizeName(club.name));
   const { error } = await supabase.from('clubs').update({ aliases }).eq('id', clubId);
-  if (error) redirect(`/admin?error=${encodeURIComponent(error.message)}`);
+  if (error) redirect(`/admin?section=clubs&error=${encodeURIComponent(error.message)}`);
+  const returnRegion = text(formData, 'return_region');
   revalidatePath('/admin');
-  redirect('/admin?success=club-alias-added');
+  redirect(`/admin?section=clubs&region=${encodeURIComponent(returnRegion)}&club=${encodeURIComponent(clubId)}&success=club-alias-added`);
 }
 
 export async function importRaceResults(formData: FormData) {
   const supabase = await requireAdmin();
   const databaseRaceId = text(formData, 'race_id');
-  if (!databaseRaceId) redirect('/admin?error=missing-race-id');
+  if (!databaseRaceId) redirect('/admin?section=import&error=missing-race-id');
 
   const { data: race, error: raceError } = await supabase
     .from('races')
     .select('id,cup_id,external_race_id,source_url')
     .eq('id', databaseRaceId)
     .single();
-  if (raceError || !race) redirect('/admin?error=race-not-found');
+  if (raceError || !race) redirect('/admin?section=import&error=race-not-found');
 
   const { importBiathlonTiming } = await import('@/lib/biathlontiming');
 
@@ -333,5 +349,5 @@ export async function importRaceResults(formData: FormData) {
     redirect(`/admin?error=${encodeURIComponent(message)}`);
   }
 
-  redirect(`/admin?success=results-imported&count=${importedCountForRedirect}&outside=${outsideCountForRedirect}`);
+  redirect(`/admin?section=import&success=results-imported&count=${importedCountForRedirect}&outside=${outsideCountForRedirect}`);
 }

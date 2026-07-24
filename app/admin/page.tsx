@@ -1,169 +1,104 @@
+import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
-import { addClassAlias, addClubAlias, createCup, createRace, importRaceResults, logout, setRaceStatus, updateClubRegion } from './admin-actions';
+import { addClassAlias, addClubAlias, createCup, createRace, createSeason, importRaceResults, logout, setRaceStatus, updateClubRegion } from './admin-actions';
 
 export const dynamic = 'force-dynamic';
 
-export default async function AdminPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
+type Params = Record<string, string | undefined>;
+type RelatedName = { name?: string } | { name?: string }[] | null;
+function relatedName(value: RelatedName) { return Array.isArray(value) ? value[0]?.name : value?.name; }
+function adminHref(section: string, params: Record<string,string|undefined> = {}) {
+  const search = new URLSearchParams({ section });
+  Object.entries(params).forEach(([key,value]) => value && search.set(key,value));
+  return `/admin?${search.toString()}`;
+}
+
+export default async function AdminPage({ searchParams }: { searchParams: Promise<Params> }) {
   const params = await searchParams;
+  const section = ['season','cup','race','import','classes','clubs'].includes(params.section ?? '') ? params.section! : 'home';
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect('/admin/login');
-
   const { data: profile } = await supabase.from('profiles').select('display_name,is_admin').eq('id', user.id).single();
   if (!profile?.is_admin) redirect('/admin/login?error=not-admin');
 
-  const [{ data: seasons }, { data: cups }, { data: races }, { data: classes }, { data: regions }, { data: clubs }] = await Promise.all([
-    supabase.from('seasons').select('id,name,is_active').order('starts_on', { ascending: false }),
+  const [{ data: seasons }, { data: cups }, { data: races }, { data: classes }, { data: regions }] = await Promise.all([
+    supabase.from('seasons').select('id,name,is_active,starts_on,ends_on').order('starts_on', { ascending: false }),
     supabase.from('cups').select('id,name,cup_type,region_id,season_id,seasons(name),regions(name)').order('created_at', { ascending: false }),
     supabase.from('races').select('id,name,race_date,status,cup_id,source_url,import_status,import_error,imported_result_count,imported_at,import_warnings,cups(name)').order('race_date', { ascending: false }),
     supabase.from('classes').select('id,name,aliases').eq('is_official', true).order('sort_order').order('name'),
     supabase.from('regions').select('id,name').eq('active', true).order('sort_order'),
-    supabase.from('clubs').select('id,name,short_name,aliases,region_id,regions(name)').order('name'),
   ]);
 
-  return (
-    <>
-      <section className="hero compact-hero">
-        <div className="hero-row">
-          <div><p className="eyebrow">Administratör</p><h1>Cupadministration</h1><p>Skapa cupen och registrera deltävlingarnas BiathlonTiming-länkar.</p></div>
-          <form action={logout}><button className="secondary" type="submit">Logga ut</button></form>
-        </div>
-      </section>
+  const selectedRegionId = params.region ?? regions?.[0]?.id ?? '';
+  let clubs: {id:string;name:string;short_name:string|null;aliases:string[]|null;region_id:string|null;regions:RelatedName}[] = [];
+  if (section === 'clubs') {
+    let query = supabase.from('clubs').select('id,name,short_name,aliases,region_id,regions(name)').order('name');
+    if (selectedRegionId) query = query.eq('region_id', selectedRegionId);
+    const { data } = await query;
+    clubs = (data ?? []) as typeof clubs;
+  }
+  const selectedClub = clubs.find(club => club.id === params.club) ?? clubs[0];
 
-      {params.success === 'cup-created' && <p className="alert success">Cupen är skapad.</p>}
-      {params.success === 'race-created' && <p className="alert success">Deltävlingen är tillagd som utkast.</p>}
-      {params.success === 'race-published' && <p className="alert success">Deltävlingen är publicerad och ingår nu i cupställningen.</p>}
-      {params.success === 'race-unpublished' && <p className="alert success">Deltävlingen är återställd till utkast.</p>}
-      {params.success === 'class-alias-added' && <p className="alert success">Klassaliaset är sparat.</p>}
-      {params.success === 'club-region-updated' && <p className="alert success">Föreningens region är uppdaterad.</p>}
-      {params.success === 'club-alias-added' && <p className="alert success">Föreningsaliaset är sparat.</p>}
-      {params.success === 'results-imported' && <p className="alert success">Importen är klar: {params.count ?? '0'} resultat sparades. {Number(params.outside ?? 0) > 0 ? `${params.outside} resultat tillhör föreningar som saknar region i klubbregistret och behöver kontrolleras.` : ''}</p>}
-      {params.error && <p className="alert error">Något gick fel: {params.error}</p>}
+  const nav = [
+    ['home','Översikt'], ['season','Ny säsong'], ['cup','Ny cup'], ['race','Koppla tävling'],
+    ['import','Import & publicering'], ['classes','Klassalias'], ['clubs','Regioner & föreningar'],
+  ];
 
-      <div className="grid">
-        <section className="card">
-          <h2>1. Skapa cup</h2>
-          <form action={createCup}>
-            <label htmlFor="season_id">Säsong</label>
-            <select id="season_id" name="season_id" required defaultValue="">
-              <option value="" disabled>Välj säsong</option>
-              {(seasons ?? []).map(s => <option key={s.id} value={s.id}>{s.name}{s.is_active ? ' (aktiv)' : ''}</option>)}
-            </select>
-            <label htmlFor="cup_name">Cupnamn</label>
-            <input id="cup_name" name="name" required placeholder="Region Syd Cup Vinter 2026" />
-            <label htmlFor="cup_type">Typ</label>
-            <select id="cup_type" name="cup_type" defaultValue="vinter"><option value="vinter">Vintercup</option><option value="sommar">Sommarcup</option></select>
-            <label htmlFor="region_id">Region</label>
-            <select id="region_id" name="region_id" required defaultValue=""><option value="" disabled>Välj region</option>{(regions ?? []).map(r => <option key={r.id} value={r.id}>{r.name}</option>)}</select>
-            <button type="submit">Skapa cup</button>
-          </form>
-        </section>
+  return <>
+    <section className="hero compact-hero admin-hero">
+      <div className="hero-row"><div><p className="eyebrow">Administratör</p><h1>Cupadministration</h1><p>Välj en funktion och arbeta med en sak i taget.</p></div><form action={logout}><button className="secondary" type="submit">Logga ut</button></form></div>
+    </section>
 
-        <section className="card">
-          <h2>2. Lägg till deltävling</h2>
-          <form action={createRace}>
-            <label htmlFor="cup_id">Cup</label>
-            <select id="cup_id" name="cup_id" required defaultValue="">
-              <option value="" disabled>Välj cup</option>
-              {(cups ?? []).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-            <label htmlFor="race_name">Tävlingsnamn</label>
-            <input id="race_name" name="name" required placeholder="Deltävling 1 – Hestra" />
-            <label htmlFor="race_date">Datum</label>
-            <input id="race_date" name="race_date" type="date" />
-            <label htmlFor="source_url">BiathlonTiming-länk</label>
-            <input id="source_url" name="source_url" type="url" required placeholder="https://results.biathlontiming.se/?raceId=..." />
-            <button type="submit">Lägg till deltävling</button>
-          </form>
-        </section>
-      </div>
+    <nav className="admin-tools" aria-label="Administrationsfunktioner">
+      {nav.map(([key,label]) => <Link key={key} className={section===key?'active':''} href={adminHref(key)}>{label}</Link>)}
+    </nav>
 
-      <section className="card section-gap">
-        <h2>Befintliga cuper</h2>
-        {(cups ?? []).length === 0 ? <p className="muted">Ingen cup skapad ännu.</p> : <table><thead><tr><th>Cup</th><th>Säsong</th><th>Typ</th><th>Region</th></tr></thead><tbody>
-          {(cups ?? []).map(c => <tr key={c.id}><td><strong>{c.name}</strong></td><td>{Array.isArray(c.seasons) ? c.seasons[0]?.name : (c.seasons as {name?:string}|null)?.name}</td><td>{c.cup_type === 'sommar' ? 'Sommar' : 'Vinter'}</td><td>{(Array.isArray(c.regions) ? c.regions[0]?.name : (c.regions as {name?:string}|null)?.name) ?? 'Region saknas'}</td></tr>)}
-        </tbody></table>}
-      </section>
+    {params.success && <p className="alert success">Ändringen är sparad.</p>}
+    {params.error && <p className="alert error">Något gick fel: {params.error}</p>}
 
-      <section className="card section-gap">
-        <h2>Klassalias</h2>
-        <p className="muted">Klasserna är gemensamma för alla cuper. Koppla alternativa klassnamn till den officiella klassen. Tävlingsformer som Massstart, Sprint och Distans normaliseras bort.</p>
-        {(classes ?? []).length === 0 ? (
-          <p className="muted">Kör databasmigreringen för att skapa cupens officiella klasser.</p>
-        ) : (
-          <>
-            <form action={addClassAlias} className="inline-form">
-              <div>
-                <label htmlFor="class_id">Officiell klass</label>
-                <select id="class_id" name="class_id" required defaultValue="">
-                  <option value="" disabled>Välj klass</option>
-                  {(classes ?? []).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
-              </div>
-              <div>
-                <label htmlFor="class_alias">Nytt alias</label>
-                <input id="class_alias" name="alias" required placeholder="Pojkar 10-11 Massstart" />
-              </div>
-              <button type="submit">Lägg till alias</button>
-            </form>
-            <table>
-              <thead><tr><th>Officiell klass</th><th>Alias</th></tr></thead>
-              <tbody>{(classes ?? []).map(c => <tr key={`class-${c.id}`}><td><strong>{c.name}</strong></td><td>{(c.aliases ?? []).length ? (c.aliases ?? []).join(', ') : '–'}</td></tr>)}</tbody>
-            </table>
-          </>
-        )}
-      </section>
+    {section === 'home' && <div className="admin-dashboard">
+      <Link href={adminHref('season')} className="admin-action-card"><span>01</span><h2>Skapa säsong</h2><p>Lägg upp vinter- eller sommarsäsong innan du skapar cupen.</p></Link>
+      <Link href={adminHref('cup')} className="admin-action-card"><span>02</span><h2>Skapa cup</h2><p>Välj säsong, typ och region för en ny regional cup.</p></Link>
+      <Link href={adminHref('race')} className="admin-action-card"><span>03</span><h2>Koppla tävling</h2><p>Lägg till en BiathlonTiming-tävling i rätt cup.</p></Link>
+      <Link href={adminHref('import')} className="admin-action-card"><span>04</span><h2>Importera resultat</h2><p>Hämta resultat, granska och publicera deltävlingen.</p></Link>
+      <Link href={adminHref('classes')} className="admin-action-card"><span>05</span><h2>Klassalias</h2><p>Koppla alternativa klassnamn till dina befintliga klasser.</p></Link>
+      <Link href={adminHref('clubs')} className="admin-action-card"><span>06</span><h2>Regioner & föreningar</h2><p>Filtrera per region och redigera en förening i taget.</p></Link>
+    </div>}
 
-      <section className="card section-gap">
-        <h2>Föreningar och regioner</h2>
-        <p className="muted">Ändra region eller lägg till ett alternativt namn som importen ska känna igen. Befintliga alias behålls.</p>
-        <div className="table-scroll"><table>
-          <thead><tr><th>Förening</th><th>Region</th><th>Alias</th><th>Åtgärd</th></tr></thead>
-          <tbody>{(clubs ?? []).map(club => <tr key={club.id}>
-            <td><strong>{club.name}</strong></td>
-            <td><form action={updateClubRegion} className="inline-form"><input type="hidden" name="club_id" value={club.id}/><select name="region_id" required defaultValue={club.region_id ?? ''}><option value="" disabled>Välj region</option>{(regions ?? []).map(r => <option key={r.id} value={r.id}>{r.name}</option>)}</select><button type="submit">Spara</button></form></td>
-            <td>{(club.aliases ?? []).length ? (club.aliases ?? []).join(', ') : '–'}</td>
-            <td><form action={addClubAlias} className="inline-form"><input type="hidden" name="club_id" value={club.id}/><input name="alias" required placeholder="Nytt föreningsalias"/><button type="submit">Lägg till</button></form></td>
-          </tr>)}</tbody>
-        </table></div>
-      </section>
+    {section === 'season' && <section className="card admin-workspace"><h2>Skapa ny säsong</h2><form action={createSeason}>
+      <label htmlFor="season_name">Namn</label><input id="season_name" name="name" required placeholder="Säsong 2026/2027" />
+      <div className="form-columns"><div><label htmlFor="starts_on">Startdatum</label><input id="starts_on" name="starts_on" type="date" required /></div><div><label htmlFor="ends_on">Slutdatum</label><input id="ends_on" name="ends_on" type="date" required /></div></div>
+      <label className="check-row"><input type="checkbox" name="is_active" value="true" defaultChecked /> Aktiv säsong</label><button type="submit">Skapa säsong</button>
+    </form><h3>Befintliga säsonger</h3><div className="table-scroll"><table><thead><tr><th>Säsong</th><th>Period</th><th>Status</th></tr></thead><tbody>{(seasons??[]).map(s=><tr key={s.id}><td><strong>{s.name}</strong></td><td>{s.starts_on} – {s.ends_on}</td><td>{s.is_active?'Aktiv':'Inaktiv'}</td></tr>)}</tbody></table></div></section>}
 
-      <section className="card section-gap">
-        <h2>3. Importera resultat</h2>
-        <p className="muted">Välj en deltävling och hämta resultaten från BiathlonTiming. När importen lyckats kan tävlingen publiceras.</p>
-        {(races ?? []).length === 0 ? (
-          <p className="muted">Lägg först till en deltävling.</p>
-        ) : (
-          <div className="import-list">
-            {(races ?? []).map(r => (
-              <article className="import-card" key={`import-${r.id}`}>
-                <div>
-                  <strong>{r.name}</strong>
-                  <p className="muted import-meta">{Array.isArray(r.cups) ? r.cups[0]?.name : (r.cups as {name?:string}|null)?.name} · {r.race_date ?? 'Datum saknas'}</p>
-                  <span className="badge">{r.import_status === 'imported' ? `${r.imported_result_count} importerade` : r.import_status === 'failed' ? 'Importfel' : r.import_status === 'processing' ? 'Importerar' : 'Inte importerad'}</span>
-                  {r.import_error && <p className="error-text">{r.import_error}</p>}
-                </div>
-                <div className="import-actions">
-                  <a className="source-button" href={`/admin/races/${r.id}`}>Granska import</a>
-                  <a className="source-button" href={r.source_url} target="_blank" rel="noreferrer">BiathlonTiming</a>
-                  <form action={importRaceResults}>
-                    <input type="hidden" name="race_id" value={r.id} />
-                    <button type="submit">{r.import_status === 'imported' ? 'Importera igen' : 'Importera resultat'}</button>
-                  </form>
-                </div>
-              </article>
-            ))}
-          </div>
-        )}
-      </section>
+    {section === 'cup' && <section className="card admin-workspace"><h2>Skapa ny cup</h2><form action={createCup}>
+      <label htmlFor="season_id">Säsong</label><select id="season_id" name="season_id" required defaultValue=""><option value="" disabled>Välj säsong</option>{(seasons??[]).map(s=><option key={s.id} value={s.id}>{s.name}{s.is_active?' (aktiv)':''}</option>)}</select>
+      <label htmlFor="cup_name">Cupnamn</label><input id="cup_name" name="name" required placeholder="Syd Cup Vinter 2027" />
+      <div className="form-columns"><div><label htmlFor="cup_type">Typ</label><select id="cup_type" name="cup_type" defaultValue="vinter"><option value="vinter">Vintercup</option><option value="sommar">Sommarcup</option></select></div><div><label htmlFor="region_id">Region</label><select id="region_id" name="region_id" required defaultValue=""><option value="" disabled>Välj region</option>{(regions??[]).map(r=><option key={r.id} value={r.id}>{r.name}</option>)}</select></div></div>
+      <button type="submit">Skapa cup</button></form><h3>Befintliga cuper</h3><div className="table-scroll"><table><thead><tr><th>Cup</th><th>Säsong</th><th>Region</th></tr></thead><tbody>{(cups??[]).map(c=><tr key={c.id}><td><strong>{c.name}</strong></td><td>{relatedName(c.seasons as RelatedName)}</td><td>{relatedName(c.regions as RelatedName)??'Region saknas'}</td></tr>)}</tbody></table></div></section>}
 
-      <section className="card section-gap">
-        <h2>Deltävlingar och publicering</h2>
-        {(races ?? []).length === 0 ? <p className="muted">Ingen deltävling tillagd ännu.</p> : <table><thead><tr><th>Tävling</th><th>Cup</th><th>Datum</th><th>Status</th><th>Källa</th><th>Import</th><th>Åtgärd</th></tr></thead><tbody>
-          {(races ?? []).map(r => <tr key={r.id}><td><strong>{r.name}</strong></td><td>{Array.isArray(r.cups) ? r.cups[0]?.name : (r.cups as {name?:string}|null)?.name}</td><td>{r.race_date ?? '–'}</td><td><span className="badge">{r.status === 'draft' ? 'Utkast' : r.status === 'published' ? 'Publicerad' : r.status}</span></td><td><div className="action-stack"><a className="text-link" href={`/admin/races/${r.id}`}>Granska import</a><a className="text-link" href={r.source_url} target="_blank" rel="noreferrer">BiathlonTiming</a></div></td><td><div className="action-stack"><span className="badge">{r.import_status === 'imported' ? `${r.imported_result_count} importerade` : r.import_status === 'failed' ? 'Importfel' : r.import_status === 'processing' ? 'Importerar' : 'Inte importerad'}</span>{r.import_error && <small className="error-text">{r.import_error}</small>}<form action={importRaceResults}><input type="hidden" name="race_id" value={r.id} /><button className="small-button secondary" type="submit">{r.import_status === 'imported' ? 'Importera igen' : 'Importera resultat'}</button></form></div></td><td><form action={setRaceStatus}><input type="hidden" name="race_id" value={r.id} /><input type="hidden" name="status" value={r.status === 'published' ? 'draft' : 'published'} /><button className="small-button" type="submit" disabled={r.import_status !== 'imported'}>{r.status === 'published' ? 'Återställ' : 'Publicera'}</button></form></td></tr>)}
-        </tbody></table>}
-      </section>
-    </>
-  );
+    {section === 'race' && <section className="card admin-workspace"><h2>Koppla tävling till cup</h2><form action={createRace}>
+      <label htmlFor="cup_id">Cup</label><select id="cup_id" name="cup_id" required defaultValue=""><option value="" disabled>Välj cup</option>{(cups??[]).map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select>
+      <label htmlFor="race_name">Tävlingsnamn</label><input id="race_name" name="name" required placeholder="Deltävling 1 – Hestra" />
+      <label htmlFor="race_date">Datum</label><input id="race_date" name="race_date" type="date" />
+      <label htmlFor="source_url">BiathlonTiming-länk</label><input id="source_url" name="source_url" type="url" required placeholder="https://results.biathlontiming.se/?raceId=..." />
+      <button type="submit">Koppla tävlingen</button></form></section>}
+
+    {section === 'classes' && <section className="card admin-workspace"><h2>Klassalias</h2><p className="muted">Klasserna och tidigare alias behålls. Lägg endast till alternativa namn som förekommer i importen.</p><form action={addClassAlias}>
+      <label htmlFor="class_id">Officiell klass</label><select id="class_id" name="class_id" required defaultValue=""><option value="" disabled>Välj klass</option>{(classes??[]).map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select>
+      <label htmlFor="class_alias">Nytt alias</label><input id="class_alias" name="alias" required placeholder="Pojkar 10-11 Massstart" /><button type="submit">Lägg till alias</button></form>
+      <div className="table-scroll"><table><thead><tr><th>Klass</th><th>Alias</th></tr></thead><tbody>{(classes??[]).map(c=><tr key={c.id}><td><strong>{c.name}</strong></td><td>{(c.aliases??[]).join(', ')||'–'}</td></tr>)}</tbody></table></div></section>}
+
+    {section === 'clubs' && <section className="admin-club-layout">
+      <aside className="card club-picker"><h2>Regioner & föreningar</h2><form method="get"><input type="hidden" name="section" value="clubs"/><label htmlFor="club_region">Region</label><select id="club_region" name="region" defaultValue={selectedRegionId}>{(regions??[]).map(r=><option key={r.id} value={r.id}>{r.name}</option>)}</select><button type="submit">Visa föreningar</button></form>
+      <div className="club-list">{clubs.map(club=><Link key={club.id} className={club.id===selectedClub?.id?'active':''} href={adminHref('clubs',{region:selectedRegionId,club:club.id})}>{club.name}</Link>)}</div></aside>
+      <section className="card admin-workspace">{selectedClub ? <><p className="eyebrow dark">Redigera förening</p><h2>{selectedClub.name}</h2><p className="muted">Nuvarande region: {relatedName(selectedClub.regions)}</p>
+        <form action={updateClubRegion}><input type="hidden" name="club_id" value={selectedClub.id}/><input type="hidden" name="return_region" value={selectedRegionId}/><label htmlFor="edit_region">Byt region</label><select id="edit_region" name="region_id" required defaultValue={selectedClub.region_id??''}>{(regions??[]).map(r=><option key={r.id} value={r.id}>{r.name}</option>)}</select><button type="submit">Spara region</button></form>
+        <hr/><h3>Föreningsalias</h3><p className="alias-box">{(selectedClub.aliases??[]).join(', ')||'Inga alias ännu'}</p><form action={addClubAlias}><input type="hidden" name="club_id" value={selectedClub.id}/><input type="hidden" name="return_region" value={selectedRegionId}/><label htmlFor="club_alias">Nytt alias</label><input id="club_alias" name="alias" required placeholder="Alternativt föreningsnamn"/><button type="submit">Lägg till alias</button></form></> : <p>Inga föreningar hittades i regionen.</p>}</section>
+    </section>}
+
+    {section === 'import' && <section className="card admin-workspace"><h2>Import & publicering</h2><div className="import-list">{(races??[]).map(r=><article className="import-card" key={r.id}><div><strong>{r.name}</strong><p className="muted import-meta">{relatedName(r.cups as RelatedName)} · {r.race_date??'Datum saknas'}</p><span className="badge">{r.import_status==='imported'?`${r.imported_result_count} importerade`:r.import_status==='failed'?'Importfel':'Inte importerad'}</span>{r.import_error&&<p className="error-text">{r.import_error}</p>}</div><div className="import-actions"><form action={importRaceResults}><input type="hidden" name="race_id" value={r.id}/><button type="submit">Importera</button></form><form action={setRaceStatus}><input type="hidden" name="race_id" value={r.id}/><input type="hidden" name="status" value={r.status==='published'?'draft':'published'}/><button className="secondary-dark" type="submit">{r.status==='published'?'Avpublicera':'Publicera'}</button></form></div></article>)}</div></section>}
+  </>;
 }
