@@ -68,3 +68,6 @@ tr.dropped td { color: var(--muted); text-decoration: line-through; background: 
 .success-badge { background: #dff3e9; color: #14583f; }
 .small-button { padding: 8px 11px; font-size: .85rem; white-space: nowrap; }
 td form { display: inline; }
+.action-stack { display: grid; gap: .45rem; min-width: 150px; }
+.error-text { color: #9b1c1c; max-width: 280px; overflow-wrap: anywhere; }
+button:disabled { opacity: .45; cursor: not-allowed; }

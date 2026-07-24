@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
-import { createCup, createRace, logout, setRaceStatus } from './actions';
+import { createCup, createRace, importRaceResults, logout, setRaceStatus } from './actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,7 +16,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   const [{ data: seasons }, { data: cups }, { data: races }] = await Promise.all([
     supabase.from('seasons').select('id,name,is_active').order('starts_on', { ascending: false }),
     supabase.from('cups').select('id,name,cup_type,season_id,seasons(name)').order('created_at', { ascending: false }),
-    supabase.from('races').select('id,name,race_date,status,cup_id,source_url,cups(name)').order('race_date', { ascending: false }),
+    supabase.from('races').select('id,name,race_date,status,cup_id,source_url,import_status,import_error,imported_result_count,imported_at,import_warnings,cups(name)').order('race_date', { ascending: false }),
   ]);
 
   return (
@@ -32,6 +32,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       {params.success === 'race-created' && <p className="alert success">Deltävlingen är tillagd som utkast.</p>}
       {params.success === 'race-published' && <p className="alert success">Deltävlingen är publicerad och ingår nu i cupställningen.</p>}
       {params.success === 'race-unpublished' && <p className="alert success">Deltävlingen är återställd till utkast.</p>}
+      {params.success === 'results-imported' && <p className="alert success">Importen är klar: {params.count ?? '0'} resultat sparades. {Number(params.outside ?? 0) > 0 ? `${params.outside} resultat tillhör klubbar utanför Region Syd och får inga cuppoäng.` : ''}</p>}
       {params.error && <p className="alert error">Något gick fel: {params.error}</p>}
 
       <div className="grid">
@@ -79,8 +80,8 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
 
       <section className="card section-gap">
         <h2>Deltävlingar</h2>
-        {(races ?? []).length === 0 ? <p className="muted">Ingen deltävling tillagd ännu.</p> : <table><thead><tr><th>Tävling</th><th>Cup</th><th>Datum</th><th>Status</th><th>Källa</th><th>Åtgärd</th></tr></thead><tbody>
-          {(races ?? []).map(r => <tr key={r.id}><td><strong>{r.name}</strong></td><td>{Array.isArray(r.cups) ? r.cups[0]?.name : (r.cups as {name?:string}|null)?.name}</td><td>{r.race_date ?? '–'}</td><td><span className="badge">{r.status === 'draft' ? 'Utkast' : r.status === 'published' ? 'Publicerad' : r.status}</span></td><td><a className="text-link" href={r.source_url} target="_blank" rel="noreferrer">Öppna resultat</a></td><td><form action={setRaceStatus}><input type="hidden" name="race_id" value={r.id} /><input type="hidden" name="status" value={r.status === 'published' ? 'draft' : 'published'} /><button className="small-button" type="submit">{r.status === 'published' ? 'Återställ' : 'Publicera'}</button></form></td></tr>)}
+        {(races ?? []).length === 0 ? <p className="muted">Ingen deltävling tillagd ännu.</p> : <table><thead><tr><th>Tävling</th><th>Cup</th><th>Datum</th><th>Status</th><th>Källa</th><th>Import</th><th>Åtgärd</th></tr></thead><tbody>
+          {(races ?? []).map(r => <tr key={r.id}><td><strong>{r.name}</strong></td><td>{Array.isArray(r.cups) ? r.cups[0]?.name : (r.cups as {name?:string}|null)?.name}</td><td>{r.race_date ?? '–'}</td><td><span className="badge">{r.status === 'draft' ? 'Utkast' : r.status === 'published' ? 'Publicerad' : r.status}</span></td><td><a className="text-link" href={r.source_url} target="_blank" rel="noreferrer">Öppna resultat</a></td><td><div className="action-stack"><span className="badge">{r.import_status === 'imported' ? `${r.imported_result_count} importerade` : r.import_status === 'failed' ? 'Importfel' : r.import_status === 'processing' ? 'Importerar' : 'Inte importerad'}</span>{r.import_error && <small className="error-text">{r.import_error}</small>}<form action={importRaceResults}><input type="hidden" name="race_id" value={r.id} /><button className="small-button secondary" type="submit">{r.import_status === 'imported' ? 'Importera igen' : 'Importera resultat'}</button></form></div></td><td><form action={setRaceStatus}><input type="hidden" name="race_id" value={r.id} /><input type="hidden" name="status" value={r.status === 'published' ? 'draft' : 'published'} /><button className="small-button" type="submit" disabled={r.import_status !== 'imported'}>{r.status === 'published' ? 'Återställ' : 'Publicera'}</button></form></td></tr>)}
         </tbody></table>}
       </section>
     </>

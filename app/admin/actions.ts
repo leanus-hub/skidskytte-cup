@@ -118,3 +118,142 @@ export async function setRaceStatus(formData: FormData) {
   revalidatePath('/admin');
   redirect(`/admin?success=${status === 'published' ? 'race-published' : 'race-unpublished'}`);
 }
+
+function normalizeName(value: string) {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLocaleLowerCase('sv-SE')
+    .replace(/&/g, ' och ')
+    .replace(/\b(idrottsforening|skidklubb|skid och orienteringsklubb|skid o orienteringsklubb)\b/g, match => match)
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+export async function importRaceResults(formData: FormData) {
+  const supabase = await requireAdmin();
+  const databaseRaceId = text(formData, 'race_id');
+  if (!databaseRaceId) redirect('/admin?error=missing-race-id');
+
+  const { data: race, error: raceError } = await supabase
+    .from('races')
+    .select('id,cup_id,external_race_id,source_url')
+    .eq('id', databaseRaceId)
+    .single();
+  if (raceError || !race) redirect('/admin?error=race-not-found');
+
+  const { importBiathlonTiming } = await import('@/lib/biathlontiming');
+
+  await supabase.from('races').update({ import_status: 'processing', import_error: null }).eq('id', race.id);
+
+  let importedCountForRedirect = 0;
+  let outsideCountForRedirect = 0;
+  try {
+    const imported = await importBiathlonTiming(race.external_race_id, race.source_url);
+    const { data: clubs } = await supabase.from('clubs').select('id,name,short_name,aliases,is_region_club,active');
+    type ClubRow = { id: string; name: string; short_name: string | null; aliases: string[] | null; is_region_club: boolean; active: boolean };
+    const clubMap = new Map<string, ClubRow>();
+    for (const club of clubs ?? []) {
+      for (const alias of [club.name, club.short_name, ...(club.aliases ?? [])]) {
+        if (alias) clubMap.set(normalizeName(alias), club);
+      }
+    }
+
+    const classCache = new Map<string, string>();
+    const athleteCache = new Map<string, string>();
+    let importedCount = 0;
+    let outsideClubCount = 0;
+
+    for (const row of imported.results) {
+      const classKey = normalizeName(row.className);
+      let classId = classCache.get(classKey);
+      if (!classId) {
+        const { data: existingClass } = await supabase
+          .from('classes').select('id').eq('cup_id', race.cup_id).ilike('name', row.className).maybeSingle();
+        if (existingClass) classId = existingClass.id;
+        else {
+          const { data: createdClass, error } = await supabase
+            .from('classes').insert({ cup_id: race.cup_id, name: row.className }).select('id').single();
+          if (error) throw error;
+          classId = createdClass.id;
+        }
+        if (!classId) throw new Error(`Klassen ${row.className} kunde inte sparas.`);
+        classCache.set(classKey, classId);
+      }
+      if (!classId) throw new Error(`Klassen ${row.className} saknar id.`);
+
+      const clubKey = normalizeName(row.clubName);
+      let club = clubMap.get(clubKey);
+      if (!club) {
+        const { data: createdClub, error } = await supabase
+          .from('clubs')
+          .insert({ name: row.clubName, short_name: row.clubName, aliases: [row.clubName], active: true, is_region_club: false })
+          .select('id,name,short_name,aliases,is_region_club,active')
+          .single();
+        if (error?.code === '23505') {
+          const { data: existing } = await supabase.from('clubs').select('id,name,short_name,aliases,is_region_club,active').eq('name', row.clubName).single();
+          club = existing ?? undefined;
+        } else if (error) throw error;
+        else club = createdClub;
+        if (club) clubMap.set(clubKey, club);
+      }
+      if (!club) throw new Error(`Klubben ${row.clubName} kunde inte sparas.`);
+      if (!club.is_region_club) outsideClubCount += 1;
+
+      const athleteKey = `${normalizeName(row.athleteName)}|${club.id}`;
+      let athleteId = athleteCache.get(athleteKey);
+      if (!athleteId) {
+        const { data: existingAthletes } = await supabase
+          .from('athletes').select('id').eq('club_id', club.id).ilike('full_name', row.athleteName).limit(1);
+        if (existingAthletes?.[0]) athleteId = existingAthletes[0].id;
+        else {
+          const { data: createdAthlete, error } = await supabase
+            .from('athletes').insert({ full_name: row.athleteName, club_id: club.id }).select('id').single();
+          if (error) throw error;
+          athleteId = createdAthlete.id;
+        }
+        if (!athleteId) throw new Error(`Åkaren ${row.athleteName} kunde inte sparas.`);
+        athleteCache.set(athleteKey, athleteId);
+      }
+      if (!athleteId) throw new Error(`Åkaren ${row.athleteName} saknar id.`);
+
+      const { error: resultError } = await supabase.from('results').upsert({
+        race_id: race.id,
+        class_id: classId,
+        athlete_id: athleteId,
+        bib: row.bib,
+        place: row.place,
+        status: row.status,
+        total_time_ms: row.totalTimeMs,
+        shooting: row.shooting,
+        shooting_hits: row.shootingHits,
+        shooting_shots: row.shootingShots,
+        raw_data: row.raw,
+      }, { onConflict: 'race_id,class_id,athlete_id' });
+      if (resultError) throw resultError;
+      importedCount += 1;
+    }
+
+    await supabase.from('races').update({
+      import_status: 'imported',
+      import_error: null,
+      imported_at: new Date().toISOString(),
+      imported_result_count: importedCount,
+      import_source_used: imported.sourceUsed,
+      import_warnings: imported.warnings,
+    }).eq('id', race.id);
+
+    importedCountForRedirect = importedCount;
+    outsideCountForRedirect = outsideClubCount;
+    revalidatePath('/');
+    revalidatePath('/admin');
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Okänt importfel';
+    await supabase.from('races').update({ import_status: 'failed', import_error: message }).eq('id', race.id);
+    revalidatePath('/admin');
+    redirect(`/admin?error=${encodeURIComponent(message)}`);
+  }
+
+  redirect(`/admin?success=results-imported&count=${importedCountForRedirect}&outside=${outsideCountForRedirect}`);
+}
