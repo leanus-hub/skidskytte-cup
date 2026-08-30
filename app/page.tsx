@@ -45,6 +45,8 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
     supabase.from('cup_race_statistics').select('*').order('cup_name').order('sort_order').order('race_date'),
   ]);
 
+  if (error) console.error('Failed to load cup standings', error);
+
   const regions = (regionRows ?? []) as Region[];
   const cups = (cupRows ?? []) as unknown as Cup[];
   const individual = (standings ?? []) as Standing[];
@@ -83,7 +85,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
     </nav>
 
     {(regionsError || cupsError) && <div className="card"><h2>Regioner eller cuper kunde inte hämtas</h2><p className="muted">{regionsError?.message ?? cupsError?.message}</p></div>}
-    {error && <div className="card"><h2>Poängmotorn är inte aktiverad</h2><p className="muted">Kör SQL-migreringen för version 6.3 i Supabase.</p></div>}
+    {error && <div className="card"><h2>Cupresultaten kunde inte hämtas</h2><p className="muted">Försök igen senare. Om problemet kvarstår, kontakta administratören.</p></div>}
     {!error && cupIds.length===0 && <div className="card"><h2>Inga cuper för {selectedRegion?.name ?? 'vald region'}</h2></div>}
 
     {visibleCups.map(cup => {
