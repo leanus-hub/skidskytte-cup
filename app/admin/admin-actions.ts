@@ -38,7 +38,6 @@ export async function logout() {
   redirect('/admin/login');
 }
 
-
 export async function createSeason(formData: FormData) {
   const supabase = await requireAdmin();
   const name = text(formData, 'name');
@@ -142,10 +141,21 @@ function normalizeName(value: string) {
     .replace(/[\u0300-\u036f]/g, '')
     .toLocaleLowerCase('sv-SE')
     .replace(/&/g, ' och ')
-    .replace(/\b(idrottsforening|skidklubb|skid och orienteringsklubb|skid o orienteringsklubb)\b/g, match => match)
     .replace(/[^a-z0-9]+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+function canonicalClubName(value: string) {
+  return normalizeName(value)
+    .replace(/^foreningen\s+/, '')
+    .replace(/\s+(idrottsforening|skidklubb)$/, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function normalizeClubName(value: string) {
+  return canonicalClubName(value).replace(/\s+/g, '');
 }
 
 function canonicalClassName(value: string) {
@@ -158,6 +168,13 @@ function canonicalClassName(value: string) {
 
 function normalizeClassName(value: string) {
   return normalizeName(canonicalClassName(value)).replace(/\s+/g, '');
+}
+
+function addUniqueName<T extends { id: string; name: string }>(map: Map<string, T | null>, key: string, row: T) {
+  if (!key) return;
+  const existing = map.get(key);
+  if (existing === undefined) map.set(key, row);
+  else if (existing && existing.id !== row.id) map.set(key, null);
 }
 
 export async function addClassAlias(formData: FormData) {
@@ -230,12 +247,13 @@ export async function importRaceResults(formData: FormData) {
   let outsideCountForRedirect = 0;
   try {
     const imported = await importBiathlonTiming(race.external_race_id, race.source_url);
-    const { data: clubs } = await supabase.from('clubs').select('id,name,short_name,aliases,region_id,active');
+    const { data: clubs, error: clubsError } = await supabase.from('clubs').select('id,name,short_name,aliases,region_id,active');
+    if (clubsError) throw clubsError;
     type ClubRow = { id: string; name: string; short_name: string | null; aliases: string[] | null; region_id: string | null; active: boolean };
-    const clubMap = new Map<string, ClubRow>();
+    const clubMap = new Map<string, ClubRow | null>();
     for (const club of clubs ?? []) {
       for (const alias of [club.name, club.short_name, ...(club.aliases ?? [])]) {
-        if (alias) clubMap.set(normalizeName(alias), club);
+        if (alias) addUniqueName(clubMap, normalizeClubName(alias), club);
       }
     }
 
@@ -246,10 +264,10 @@ export async function importRaceResults(formData: FormData) {
       .eq('is_official', true);
     if (classesError) throw classesError;
 
-    const classMap = new Map<string, ClassRow>();
+    const classMap = new Map<string, ClassRow | null>();
     for (const classRow of existingClasses ?? []) {
       for (const alias of [classRow.name, ...(classRow.aliases ?? [])]) {
-        if (alias) classMap.set(normalizeClassName(alias), classRow);
+        if (alias) addUniqueName(classMap, normalizeClassName(alias), classRow);
       }
     }
 
@@ -263,44 +281,38 @@ export async function importRaceResults(formData: FormData) {
       let classId = classCache.get(classKey);
       if (!classId) {
         const matchedClass = classMap.get(classKey);
+        if (matchedClass === null) {
+          throw new Error(`Tvetydig klass: ${row.className}. Flera officiella klasser matchar samma normaliserade namn.`);
+        }
         if (!matchedClass) {
-          throw new Error(
-            `Okänd klass: ${row.className}. Lägg till namnet som alias under Klassalias och importera igen.`
-          );
+          throw new Error(`Okänd klass: ${row.className}. Lägg till namnet som alias under Klassalias och importera igen.`);
         }
-
         classId = matchedClass.id;
-        for (const alias of [matchedClass.name, ...(matchedClass.aliases ?? [])]) {
-          classMap.set(normalizeClassName(alias), matchedClass);
-          classCache.set(normalizeClassName(alias), matchedClass.id);
-        }
+        classCache.set(classKey, matchedClass.id);
       }
       if (!classId) throw new Error(`Klassen ${row.className} saknar id.`);
 
-      const clubKey = normalizeName(row.clubName);
-      let club = clubMap.get(clubKey);
-      if (!club) {
-        const { data: createdClub, error } = await supabase
-          .from('clubs')
-          .insert({ name: row.clubName, short_name: row.clubName, aliases: [row.clubName], active: true, region_id: null })
-          .select('id,name,short_name,aliases,region_id,active')
-          .single();
-        if (error?.code === '23505') {
-          const { data: existing } = await supabase.from('clubs').select('id,name,short_name,aliases,region_id,active').eq('name', row.clubName).single();
-          club = existing ?? undefined;
-        } else if (error) throw error;
-        else club = createdClub;
-        if (club) clubMap.set(clubKey, club);
+      const clubKey = normalizeClubName(row.clubName);
+      const club = clubMap.get(clubKey);
+      if (club === null) {
+        throw new Error(`Tvetydig klubb: ${row.clubName}. Flera klubbar matchar samma normaliserade namn. Lös klubbnamnet i admin innan import.`);
       }
-      if (!club) throw new Error(`Klubben ${row.clubName} kunde inte sparas.`);
+      if (!club) {
+        throw new Error(`Okänd klubb: ${row.clubName}. Lägg till namnet som alias på rätt klubb i admin och importera igen.`);
+      }
       if (!club.region_id) outsideClubCount += 1;
 
       const athleteKey = `${normalizeName(row.athleteName)}|${club.id}`;
       let athleteId = athleteCache.get(athleteKey);
       if (!athleteId) {
-        const { data: existingAthletes } = await supabase
-          .from('athletes').select('id').eq('club_id', club.id).ilike('full_name', row.athleteName).limit(1);
-        if (existingAthletes?.[0]) athleteId = existingAthletes[0].id;
+        const { data: clubAthletes, error: athleteReadError } = await supabase
+          .from('athletes').select('id,full_name').eq('club_id', club.id);
+        if (athleteReadError) throw athleteReadError;
+        const matchingAthletes = (clubAthletes ?? []).filter(candidate => normalizeName(candidate.full_name) === normalizeName(row.athleteName));
+        if (matchingAthletes.length > 1) {
+          throw new Error(`Tvetydig åkare: ${row.athleteName} i ${club.name}. Flera befintliga åkare matchar samma normaliserade namn.`);
+        }
+        if (matchingAthletes[0]) athleteId = matchingAthletes[0].id;
         else {
           const { data: createdAthlete, error } = await supabase
             .from('athletes').insert({ full_name: row.athleteName, club_id: club.id }).select('id').single();
