@@ -199,6 +199,44 @@ export async function addClassAlias(formData: FormData) {
   redirect('/admin?section=classes&success=class-alias-added');
 }
 
+export async function createClub(formData: FormData) {
+  const supabase = await requireAdmin();
+  const name = text(formData, 'name');
+  const shortName = text(formData, 'short_name');
+  const regionId = text(formData, 'region_id');
+  if (!name || !regionId) redirect('/admin?section=clubs&error=club-create-fields');
+
+  const { data: clubs, error: readError } = await supabase
+    .from('clubs')
+    .select('id,name,short_name,aliases');
+  if (readError) redirect(`/admin?section=clubs&error=${encodeURIComponent(readError.message)}`);
+
+  const requestedKeys = new Set([name, shortName].filter(Boolean).map(normalizeClubName));
+  const duplicate = (clubs ?? []).find(club =>
+    [club.name, club.short_name, ...(club.aliases ?? [])]
+      .filter(Boolean)
+      .some(value => requestedKeys.has(normalizeClubName(String(value))))
+  );
+  if (duplicate) redirect(`/admin?section=clubs&club=${encodeURIComponent(duplicate.id)}&error=club-duplicate`);
+
+  const { data: created, error } = await supabase
+    .from('clubs')
+    .insert({
+      name,
+      short_name: shortName || null,
+      region_id: regionId,
+      active: true,
+      aliases: [],
+    })
+    .select('id')
+    .single();
+  if (error || !created) redirect(`/admin?section=clubs&error=${encodeURIComponent(error?.message ?? 'club-create-failed')}`);
+
+  revalidatePath('/');
+  revalidatePath('/admin');
+  redirect(`/admin?section=clubs&region=${encodeURIComponent(regionId)}&club=${encodeURIComponent(created.id)}&success=club-created`);
+}
+
 export async function updateClubRegion(formData: FormData) {
   const supabase = await requireAdmin();
   const clubId = text(formData, 'club_id');
@@ -335,31 +373,27 @@ export async function importRaceResults(formData: FormData) {
         shooting: row.shooting,
         shooting_hits: row.shootingHits,
         shooting_shots: row.shootingShots,
-        raw_data: row.raw,
+        source_class_name: row.className,
+        source_club_name: row.clubName,
       }, { onConflict: 'race_id,class_id,athlete_id' });
       if (resultError) throw resultError;
       importedCount += 1;
     }
 
-    await supabase.from('races').update({
-      import_status: 'imported',
-      import_error: null,
-      imported_at: new Date().toISOString(),
-      imported_result_count: importedCount,
-      import_source_used: imported.sourceUsed,
-      import_warnings: imported.warnings,
-    }).eq('id', race.id);
-
     importedCountForRedirect = importedCount;
     outsideCountForRedirect = outsideClubCount;
-    revalidatePath('/');
-    revalidatePath('/admin');
+    await supabase.from('races').update({
+      import_status: 'success',
+      import_error: null,
+      imported_at: new Date().toISOString(),
+    }).eq('id', race.id);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Okänt importfel';
-    await supabase.from('races').update({ import_status: 'failed', import_error: message }).eq('id', race.id);
-    revalidatePath('/admin');
-    redirect(`/admin?error=${encodeURIComponent(message)}`);
+    await supabase.from('races').update({ import_status: 'error', import_error: message }).eq('id', race.id);
+    redirect(`/admin?section=import&error=${encodeURIComponent(message)}`);
   }
 
-  redirect(`/admin?section=import&success=results-imported&count=${importedCountForRedirect}&outside=${outsideCountForRedirect}`);
+  revalidatePath('/');
+  revalidatePath('/admin');
+  redirect(`/admin?section=import&success=import-complete&count=${importedCountForRedirect}&outside=${outsideCountForRedirect}`);
 }
