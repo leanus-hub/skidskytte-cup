@@ -37,7 +37,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const supabase = await createClient();
   const [{data:regionRows,error:regionsError},{data:cupRows,error:cupsError},{data:standings,error},{data:breakdown},{data:classRows},{data:clubRows},{data:raceStats}] = await Promise.all([
     supabase.from('regions').select('id,name,sort_order').order('sort_order'),
-    supabase.from('cups').select('id,name,season_id,region_id').order('created_at'),
+    supabase.from('cups').select('id,name,season_id,region_id').order('created_at', { ascending: false }),
     supabase.from('cup_standings').select('*').order('cup_name').order('class_name').order('cup_place'),
     supabase.from('cup_result_breakdown').select('cup_id,class_id,athlete_id,race_id,race_name,region_place,cup_points,shooting_hits,shooting_shots,is_counted').order('race_date').order('sort_order'),
     supabase.from('cup_class_standings').select('*').order('cup_name').order('class_name'),
