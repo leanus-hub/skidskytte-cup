@@ -5,6 +5,8 @@
 -- point regardless of placement. All other classes retain the existing
 -- Syd Cup placement points.
 --
+-- Öppen Klass is also excluded from club medal statistics.
+--
 -- Official class_id for Öppen Klass:
 -- 5ef5e33c-b112-4c0d-853c-7a2a32af2c5f
 
@@ -86,3 +88,89 @@ select
         else public.syd_cup_points(region_place)
     end as cup_points
 from eligible_results;
+
+create or replace view public.cup_club_standings
+with (security_invoker = true)
+as
+with medal_rows as (
+    select
+        rp.cup_id,
+        rp.club_id,
+        count(*) filter (
+            where rp.region_place = 1
+              and rp.class_id <> '5ef5e33c-b112-4c0d-853c-7a2a32af2c5f'::uuid
+        )::integer as gold,
+        count(*) filter (
+            where rp.region_place = 2
+              and rp.class_id <> '5ef5e33c-b112-4c0d-853c-7a2a32af2c5f'::uuid
+        )::integer as silver,
+        count(*) filter (
+            where rp.region_place = 3
+              and rp.class_id <> '5ef5e33c-b112-4c0d-853c-7a2a32af2c5f'::uuid
+        )::integer as bronze
+    from public.cup_result_points rp
+    group by rp.cup_id, rp.club_id
+),
+totals as (
+    select
+        cs.cup_id,
+        cs.cup_name,
+        cs.season_name,
+        cs.club_id,
+        cs.club_name,
+        cs.region_id,
+        cs.region_name,
+        count(distinct cs.athlete_id)::integer as athlete_count,
+        sum(cs.total_points)::integer as total_points,
+        sum(cs.races_participated)::integer as total_starts,
+        sum(cs.shooting_hits)::integer as shooting_hits,
+        sum(cs.shooting_shots)::integer as shooting_shots
+    from public.cup_standings cs
+    group by
+        cs.cup_id,
+        cs.cup_name,
+        cs.season_name,
+        cs.club_id,
+        cs.club_name,
+        cs.region_id,
+        cs.region_name
+)
+select
+    t.cup_id,
+    t.cup_name,
+    t.season_name,
+    t.club_id,
+    t.club_name,
+    t.region_id,
+    t.region_name,
+    t.athlete_count,
+    t.total_points,
+    t.total_starts,
+    t.shooting_hits,
+    t.shooting_shots,
+    coalesce(m.gold, 0) as gold,
+    coalesce(m.silver, 0) as silver,
+    coalesce(m.bronze, 0) as bronze,
+    coalesce(m.gold, 0) + coalesce(m.silver, 0) + coalesce(m.bronze, 0) as medals,
+    case
+        when t.shooting_shots > 0 then
+            round(
+                100.0 * t.shooting_hits::numeric
+                / nullif(t.shooting_shots, 0)::numeric,
+                2
+            )
+        else null::numeric
+    end as shooting_percentage,
+    rank() over (
+        partition by t.cup_id
+        order by
+            t.total_points desc,
+            (
+                t.shooting_hits::numeric
+                / nullif(t.shooting_shots, 0)::numeric
+            ) desc nulls last
+    )::integer as club_place
+from totals t
+left join medal_rows m
+    on m.cup_id = t.cup_id
+   and m.club_id = t.club_id;
