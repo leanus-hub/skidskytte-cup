@@ -14,7 +14,7 @@ type Standing = {
 };
 type Breakdown = { cup_id:string; class_id:string; athlete_id:string; race_id:string; race_name:string; region_place:number; cup_points:number; shooting_hits:number|null; shooting_shots:number|null; is_counted:boolean };
 type ClassStanding = { cup_id:string; cup_name:string; season_name:string; class_id:string; class_name:string; athlete_count:number; total_points:number; total_starts:number; shooting_percentage:number|null };
-type ClubStanding = { cup_id:string; cup_name:string; season_name:string; club_id:string; club_name:string; club_place:number; athlete_count:number; total_points:number; total_starts:number; gold:number; silver:number; bronze:number; medals:number; shooting_hits:number; shooting_shots:number; shooting_percentage:number|null };
+type ClubStanding = { cup_id:string; cup_name:string; season_name:string; club_id:string; club_name:string; club_place:number; athlete_count:number; total_points:number; total_starts:number; gold:number; silver:number; bronze:number; medals:number; shooting_hits:number; shooting_shots:number; shooting_percentage:number|null; medal_points:number; medal_place:number };
 type RaceStatistic = { cup_id:string; cup_name:string; season_name:string; region_id:string; region_name:string; race_id:string; race_name:string; race_date:string|null; sort_order:number; regional_participants:number; all_participants:number; regional_clubs:number; regional_classes:number; shooting_percentage:number|null };
 
 function pct(value:number|null){ return value == null ? '–' : `${Number(value).toFixed(2)} %`; }
@@ -27,7 +27,7 @@ function href(params:Record<string,string|undefined>) {
 
 function safeAverage(total:number, count:number) { return count > 0 ? total / count : 0; }
 function medalRank(rows:ClubStanding[]) {
-  return [...rows].sort((a,b)=>b.gold-a.gold || b.silver-a.silver || b.bronze-a.bronze || a.club_name.localeCompare(b.club_name,'sv'));
+  return [...rows].sort((a,b)=>a.medal_place-b.medal_place || a.club_name.localeCompare(b.club_name,'sv'));
 }
 
 export default async function HomePage({ searchParams }: { searchParams: Promise<Record<string,string|undefined>> }) {
@@ -120,7 +120,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           <div className="dashboard-metric"><span>Deltagande klubbar</span><strong>{cupClubs.length}</strong></div>
           <div className="dashboard-metric"><span>Regionala starter</span><strong>{totalRegionalStarts}</strong></div>
           <div className="dashboard-leader"><span>Poängligan</span><strong>{pointsLeader?.club_name ?? '–'}</strong><small>{pointsLeader ? `${pointsLeader.total_points} poäng` : 'Inga resultat'}</small></div>
-          <div className="dashboard-leader"><span>Medaljligan</span><strong>{medalLeader?.club_name ?? '–'}</strong><small>{medalLeader ? `${medalLeader.gold} guld · ${medalLeader.medals} medaljer` : 'Inga resultat'}</small></div>
+          <div className="dashboard-leader"><span>Medaljligan</span><strong>{medalLeader?.club_name ?? '–'}</strong><small>{medalLeader ? `${medalLeader.medal_points} medaljpoäng · ${medalLeader.gold} guld` : 'Inga resultat'}</small></div>
         </section>
 
         {view==='individual' && cupIndividuals.length === 0 && <div className="card empty-state"><h3>Inga publicerade individuella resultat ännu</h3><p className="muted">Cupen är korrekt kopplad till regionen, men sammanställningen innehåller ännu inga rader. Kontrollera att en tävling är importerad och publicerad.</p></div>}
@@ -144,7 +144,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
             <Link className={clubView==='medals'?'active':''} href={href({region:selectedRegionId,cup:selectedCupId,view:'club',clubView:'medals'})}>Medaljliga</Link>
           </nav>
           {clubView==='points' && <section className="card standings-card"><h3>Klubbarnas poängliga</h3><p className="table-note">Placering efter total cup-poäng. Träffprocent används som skiljekriterium.</p><div className="table-scroll"><table><thead><tr><th>Plats</th><th>Klubb</th><th>Aktiva</th><th>Poäng</th><th>Starter</th><th>Skytte</th></tr></thead><tbody>{clubs.filter(r=>r.cup_id===cupId).sort((a,b)=>a.club_place-b.club_place).map(row=><tr key={row.club_id}><td><strong>{row.club_place}</strong></td><td><strong>{row.club_name}</strong></td><td>{row.athlete_count}</td><td><strong>{row.total_points}</strong></td><td>{row.total_starts}</td><td>{pct(row.shooting_percentage)}</td></tr>)}</tbody></table></div></section>}
-          {clubView==='medals' && <section className="card standings-card"><h3>Klubbarnas medaljliga</h3><p className="table-note">Placering efter guld, därefter silver och brons. Öppen Klass räknas inte in i medaljligan.</p><div className="table-scroll"><table><thead><tr><th>Plats</th><th>Klubb</th><th>Guld</th><th>Silver</th><th>Brons</th><th>Totalt</th></tr></thead><tbody>{medalRank(clubs.filter(r=>r.cup_id===cupId)).map((row,index)=><tr key={row.club_id}><td><strong>{index+1}</strong></td><td><strong>{row.club_name}</strong></td><td>{row.gold}</td><td>{row.silver}</td><td>{row.bronze}</td><td><strong>{row.medals}</strong></td></tr>)}</tbody></table></div></section>}
+          {clubView==='medals' && <section className="card standings-card"><h3>Klubbarnas medaljliga</h3><p className="table-note">Placering efter medaljpoäng (guld 3, silver 2, brons 1), därefter antal guld och silver. Öppen Klass räknas inte in.</p><div className="table-scroll"><table><thead><tr><th>Plats</th><th>Klubb</th><th>Medaljpoäng</th><th>Guld</th><th>Silver</th><th>Brons</th><th>Medaljer</th></tr></thead><tbody>{medalRank(clubs.filter(r=>r.cup_id===cupId)).map(row=><tr key={row.club_id}><td><strong>{row.medal_place}</strong></td><td><strong>{row.club_name}</strong></td><td><strong>{row.medal_points}</strong></td><td>{row.gold}</td><td>{row.silver}</td><td>{row.bronze}</td><td>{row.medals}</td></tr>)}</tbody></table></div></section>}
         </>}
 
         {view==='statistics' && <>
