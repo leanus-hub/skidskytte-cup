@@ -309,6 +309,20 @@ export async function importRaceResults(formData: FormData) {
       }
     }
 
+    type AthleteRow = { id: string; full_name: string; club_id: string };
+    const { data: existingAthletes, error: athletesError } = await supabase
+      .from('athletes')
+      .select('id,full_name,club_id');
+    if (athletesError) throw athletesError;
+
+    const athleteMap = new Map<string, AthleteRow | null>();
+    for (const athlete of existingAthletes ?? []) {
+      const key = `${normalizeName(athlete.full_name)}|${athlete.club_id}`;
+      const existing = athleteMap.get(key);
+      if (existing === undefined) athleteMap.set(key, athlete);
+      else if (existing && existing.id !== athlete.id) athleteMap.set(key, null);
+    }
+
     const classCache = new Map<string, string>();
     const athleteCache = new Map<string, string>();
     let importedCount = 0;
@@ -343,19 +357,17 @@ export async function importRaceResults(formData: FormData) {
       const athleteKey = `${normalizeName(row.athleteName)}|${club.id}`;
       let athleteId = athleteCache.get(athleteKey);
       if (!athleteId) {
-        const { data: clubAthletes, error: athleteReadError } = await supabase
-          .from('athletes').select('id,full_name').eq('club_id', club.id);
-        if (athleteReadError) throw athleteReadError;
-        const matchingAthletes = (clubAthletes ?? []).filter(candidate => normalizeName(candidate.full_name) === normalizeName(row.athleteName));
-        if (matchingAthletes.length > 1) {
+        const matchedAthlete = athleteMap.get(athleteKey);
+        if (matchedAthlete === null) {
           throw new Error(`Tvetydig åkare: ${row.athleteName} i ${club.name}. Flera befintliga åkare matchar samma normaliserade namn.`);
         }
-        if (matchingAthletes[0]) athleteId = matchingAthletes[0].id;
+        if (matchedAthlete) athleteId = matchedAthlete.id;
         else {
           const { data: createdAthlete, error } = await supabase
-            .from('athletes').insert({ full_name: row.athleteName, club_id: club.id }).select('id').single();
+            .from('athletes').insert({ full_name: row.athleteName, club_id: club.id }).select('id,full_name,club_id').single();
           if (error) throw error;
           athleteId = createdAthlete.id;
+          athleteMap.set(athleteKey, createdAthlete);
         }
         if (!athleteId) throw new Error(`Åkaren ${row.athleteName} kunde inte sparas.`);
         athleteCache.set(athleteKey, athleteId);
