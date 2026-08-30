@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { addClubAlias, updateClubRegion } from './admin-actions';
+import { addClubAlias, createClub, updateClubRegion } from './admin-actions';
 
 type Region = { id: string; name: string };
 type Club = {
@@ -80,6 +80,24 @@ export default function ClubManager({
       </select>
 
       <p className="muted club-count">{filteredClubs.length} av {clubs.length} föreningar visas</p>
+
+      <hr/>
+      <h3>Skapa ny förening</h3>
+      <p className="muted">Används när en importerad förening verkligen är ny. Befintliga namn och alias kontrolleras för att undvika dubletter.</p>
+      <form action={createClub}>
+        <label htmlFor="new_club_name">Föreningsnamn</label>
+        <input id="new_club_name" name="name" required placeholder="Officiellt föreningsnamn"/>
+
+        <label htmlFor="new_club_short_name">Kortnamn</label>
+        <input id="new_club_short_name" name="short_name" placeholder="Valfritt kortnamn"/>
+
+        <label htmlFor="new_club_region">Region</label>
+        <select id="new_club_region" name="region_id" required defaultValue={filterRegionId !== ALL && filterRegionId !== UNASSIGNED ? filterRegionId : ''}>
+          <option value="" disabled>Välj region</option>
+          {regions.map(region => <option key={region.id} value={region.id}>{region.name}</option>)}
+        </select>
+        <button type="submit">Skapa förening</button>
+      </form>
     </aside>
 
     <section className="card admin-workspace">
