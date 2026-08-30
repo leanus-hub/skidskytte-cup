@@ -45,7 +45,13 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
     supabase.from('cup_race_statistics').select('*').order('cup_name').order('sort_order').order('race_date'),
   ]);
 
-  if (error) console.error('Failed to load cup standings', error);
+  if (regionsError || cupsError || error) {
+    console.error('Failed to load public cup summary', {
+      regions: regionsError,
+      cups: cupsError,
+      standings: error,
+    });
+  }
 
   const regions = (regionRows ?? []) as Region[];
   const cups = (cupRows ?? []) as unknown as Cup[];
@@ -84,7 +90,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
       <Link className={view==='statistics'?'active':''} href={href({region:selectedRegionId,cup:selectedCupId,view:'statistics'})}>Cupstatistik</Link>
     </nav>
 
-    {(regionsError || cupsError) && <div className="card"><h2>Regioner eller cuper kunde inte hämtas</h2><p className="muted">{regionsError?.message ?? cupsError?.message}</p></div>}
+    {(regionsError || cupsError) && <div className="card"><h2>Regioner eller cuper kunde inte hämtas</h2><p className="muted">Försök igen senare. Om problemet kvarstår, kontakta administratören.</p></div>}
     {error && <div className="card"><h2>Cupresultaten kunde inte hämtas</h2><p className="muted">Försök igen senare. Om problemet kvarstår, kontakta administratören.</p></div>}
     {!error && cupIds.length===0 && <div className="card"><h2>Inga cuper för {selectedRegion?.name ?? 'vald region'}</h2></div>}
 
@@ -137,37 +143,21 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
             <Link className={clubView==='points'?'active':''} href={href({region:selectedRegionId,cup:selectedCupId,view:'club',clubView:'points'})}>Poängliga</Link>
             <Link className={clubView==='medals'?'active':''} href={href({region:selectedRegionId,cup:selectedCupId,view:'club',clubView:'medals'})}>Medaljliga</Link>
           </nav>
-          {clubView==='points' && <section className="card standings-card"><h3>Klubbarnas poängliga</h3><p className="table-note">Placering efter total cup-poäng. Träffprocent används som skiljekriterium.</p><div className="table-scroll"><table><thead><tr><th>Plats</th><th>Klubb</th><th>Aktiva</th><th>Poäng</th><th>Starter</th><th>Skytte</th></tr></thead><tbody>{clubs.filter(r=>r.cup_id===cupId).sort((a,b)=>a.club_place-b.club_place).map(row=><tr key={row.club_id}><td><strong>{row.club_place}</strong></td><td><strong>{row.club_name}</strong></td><td>{row.athlete_count}</td><td><strong>{row.total_points}</strong></td><td>{row.total_starts}</td><td>{row.shooting_hits}/{row.shooting_shots} · {pct(row.shooting_percentage)}</td></tr>)}</tbody></table></div></section>}
-          {clubView==='medals' && <section className="card standings-card"><h3>Klubbarnas medaljliga</h3><p className="table-note">Placering efter flest guld, därefter silver och brons.</p><div className="table-scroll"><table><thead><tr><th>Plats</th><th>Klubb</th><th>🥇 Guld</th><th>🥈 Silver</th><th>🥉 Brons</th><th>Totalt</th></tr></thead><tbody>{clubs.filter(r=>r.cup_id===cupId).sort((a,b)=>b.gold-a.gold || b.silver-a.silver || b.bronze-a.bronze || a.club_name.localeCompare(b.club_name,'sv')).map((row,index)=><tr key={row.club_id}><td><strong>{index+1}</strong></td><td><strong>{row.club_name}</strong></td><td>{row.gold}</td><td>{row.silver}</td><td>{row.bronze}</td><td><strong>{row.medals}</strong></td></tr>)}</tbody></table></div></section>}
+          {clubView==='points' && <section className="card standings-card"><h3>Klubbarnas poängliga</h3><p className="table-note">Placering efter total cup-poäng. Träffprocent används som skiljekriterium.</p><div className="table-scroll"><table><thead><tr><th>Plats</th><th>Klubb</th><th>Aktiva</th><th>Poäng</th><th>Starter</th><th>Skytte</th></tr></thead><tbody>{clubs.filter(r=>r.cup_id===cupId).sort((a,b)=>a.club_place-b.club_place).map(row=><tr key={row.club_id}><td><strong>{row.club_place}</strong></td><td><strong>{row.club_name}</strong></td><td>{row.athlete_count}</td><td><strong>{row.total_points}</strong></td><td>{row.total_starts}</td><td>{pct(row.shooting_percentage)}</td></tr>)}</tbody></table></div></section>}
+          {clubView==='medals' && <section className="card standings-card"><h3>Klubbarnas medaljliga</h3><p className="table-note">Placering efter guld, därefter silver och brons. Öppen Klass räknas inte in i medaljligan.</p><div className="table-scroll"><table><thead><tr><th>Plats</th><th>Klubb</th><th>Guld</th><th>Silver</th><th>Brons</th><th>Totalt</th></tr></thead><tbody>{medalRank(clubs.filter(r=>r.cup_id===cupId)).map((row,index)=><tr key={row.club_id}><td><strong>{index+1}</strong></td><td><strong>{row.club_name}</strong></td><td>{row.gold}</td><td>{row.silver}</td><td>{row.bronze}</td><td><strong>{row.medals}</strong></td></tr>)}</tbody></table></div></section>}
         </>}
 
         {view==='statistics' && <>
-          <section className="record-grid">
-            <div className="record-card featured"><span>Mest besökta tävlingen</span><strong>{biggestRace?.race_name ?? '–'}</strong><small>{biggestRace ? `${biggestRace.regional_participants} regionala deltagare` : 'Inga publicerade resultat'}</small></div>
-            <div className="record-card"><span>Minsta tävlingen</span><strong>{smallestRace?.race_name ?? '–'}</strong><small>{smallestRace ? `${smallestRace.regional_participants} regionala deltagare` : 'Inga publicerade resultat'}</small></div>
-            <div className="record-card"><span>Flest starter – klubb</span><strong>{mostActiveClub?.club_name ?? '–'}</strong><small>{mostActiveClub ? `${mostActiveClub.total_starts} starter` : 'Inga resultat'}</small></div>
-            <div className="record-card"><span>Flest starter – klass</span><strong>{mostActiveClass?.class_name ?? '–'}</strong><small>{mostActiveClass ? `${mostActiveClass.total_starts} starter` : 'Inga resultat'}</small></div>
-            <div className="record-card"><span>Flest deltävlingar – åkare</span><strong>{mostActiveAthlete?.athlete_name ?? '–'}</strong><small>{mostActiveAthlete ? `${mostActiveAthlete.races_participated} starter · ${mostActiveAthlete.club_name}` : 'Inga resultat'}</small></div>
-            <div className="record-card"><span>Högst poängsnitt</span><strong>{bestPointAverage?.athlete_name ?? '–'}</strong><small>{bestPointAverage ? `${safeAverage(bestPointAverage.total_points,bestPointAverage.races_counted).toFixed(1)} poäng/räknad start` : 'Inga resultat'}</small></div>
-            <div className="record-card"><span>Bäst poäng per start – klubb</span><strong>{bestClubEfficiency?.club_name ?? '–'}</strong><small>{bestClubEfficiency ? `${safeAverage(bestClubEfficiency.total_points,bestClubEfficiency.total_starts).toFixed(1)} poäng/start` : 'Inga resultat'}</small></div>
-            <div className="record-card"><span>Flest medaljer</span><strong>{medalLeader?.club_name ?? '–'}</strong><small>{medalLeader ? `${medalLeader.medals} totalt · ${medalLeader.gold} guld` : 'Inga resultat'}</small></div>
+          <section className="insight-grid">
+            <article className="card insight-card"><span>Största deltävling</span><strong>{biggestRace?.race_name ?? '–'}</strong><small>{biggestRace ? `${biggestRace.regional_participants} regionala starter` : 'Ingen statistik'}</small></article>
+            <article className="card insight-card"><span>Minsta deltävling</span><strong>{smallestRace?.race_name ?? '–'}</strong><small>{smallestRace ? `${smallestRace.regional_participants} regionala starter` : 'Ingen statistik'}</small></article>
+            <article className="card insight-card"><span>Mest aktiv klubb</span><strong>{mostActiveClub?.club_name ?? '–'}</strong><small>{mostActiveClub ? `${mostActiveClub.total_starts} starter` : 'Ingen statistik'}</small></article>
+            <article className="card insight-card"><span>Mest aktiv klass</span><strong>{mostActiveClass?.class_name ?? '–'}</strong><small>{mostActiveClass ? `${mostActiveClass.total_starts} starter` : 'Ingen statistik'}</small></article>
+            <article className="card insight-card"><span>Flest starter per åkare</span><strong>{mostActiveAthlete?.athlete_name ?? '–'}</strong><small>{mostActiveAthlete ? `${mostActiveAthlete.races_participated} starter` : 'Ingen statistik'}</small></article>
+            <article className="card insight-card"><span>Högst poängsnitt</span><strong>{bestPointAverage?.athlete_name ?? '–'}</strong><small>{bestPointAverage ? `${safeAverage(bestPointAverage.total_points,bestPointAverage.races_counted).toFixed(2)} p/räknad start` : 'Ingen statistik'}</small></article>
+            <article className="card insight-card"><span>Effektivaste klubb</span><strong>{bestClubEfficiency?.club_name ?? '–'}</strong><small>{bestClubEfficiency ? `${safeAverage(bestClubEfficiency.total_points,bestClubEfficiency.total_starts).toFixed(2)} p/start` : 'Ingen statistik'}</small></article>
           </section>
-
-          <section className="stats-grid">
-            <div className="metric-card"><span>Deltävlingar</span><strong>{cupStatistics.length}</strong></div>
-            <div className="metric-card"><span>Unika åkare</span><strong>{cupIndividuals.length}</strong></div>
-            <div className="metric-card"><span>Regionala starter</span><strong>{totalRegionalStarts}</strong></div>
-            <div className="metric-card"><span>Importerade starter</span><strong>{cupStatistics.reduce((sum,row)=>sum+row.all_participants,0)}</strong></div>
-            <div className="metric-card"><span>Snitt per tävling</span><strong>{cupStatistics.length ? (totalRegionalStarts/cupStatistics.length).toFixed(1) : '0'}</strong></div>
-            <div className="metric-card"><span>Deltagande klubbar</span><strong>{cupClubs.length}</strong></div>
-          </section>
-
-          <section className="card standings-card"><h3>Deltagande per tävling</h3><p className="table-note">Regionala deltagare räknas i cupen. Alla importerade inkluderar även deltagare från andra regioner.</p><div className="table-scroll"><table><thead><tr><th>Deltävling</th><th>Datum</th><th>Regionala deltagare</th><th>Alla importerade</th><th>Klubbar</th><th>Klasser</th><th>Skytte</th></tr></thead><tbody>{cupStatistics.map(row=><tr key={row.race_id} className={row.race_id===biggestRace?.race_id?'top-stat-row':''}><td><strong>{row.race_name}</strong></td><td>{row.race_date ?? '–'}</td><td><strong>{row.regional_participants}</strong></td><td>{row.all_participants}</td><td>{row.regional_clubs}</td><td>{row.regional_classes}</td><td>{pct(row.shooting_percentage)}</td></tr>)}</tbody></table></div></section>
-
-          <div className="insight-columns">
-            <section className="card standings-card"><h3>Flest starter per klubb</h3><div className="table-scroll"><table><thead><tr><th>Plats</th><th>Klubb</th><th>Starter</th><th>Åkare</th></tr></thead><tbody>{[...cupClubs].sort((a,b)=>b.total_starts-a.total_starts || a.club_name.localeCompare(b.club_name,'sv')).map((row,index)=><tr key={row.club_id}><td>{index+1}</td><td><strong>{row.club_name}</strong></td><td>{row.total_starts}</td><td>{row.athlete_count}</td></tr>)}</tbody></table></div></section>
-            <section className="card standings-card"><h3>Flest starter per klass</h3><div className="table-scroll"><table><thead><tr><th>Plats</th><th>Klass</th><th>Starter</th><th>Åkare</th></tr></thead><tbody>{[...cupClasses].sort((a,b)=>b.total_starts-a.total_starts || a.class_name.localeCompare(b.class_name,'sv')).map((row,index)=><tr key={row.class_id}><td>{index+1}</td><td><strong>{row.class_name}</strong></td><td>{row.total_starts}</td><td>{row.athlete_count}</td></tr>)}</tbody></table></div></section>
-          </div>
+          <section className="card standings-card"><h3>Deltävlingar</h3><div className="table-scroll"><table><thead><tr><th>Deltävling</th><th>Datum</th><th>Regionala</th><th>Totalt</th><th>Klubbar</th><th>Klasser</th><th>Skytte</th></tr></thead><tbody>{cupStatistics.map(row=><tr key={row.race_id}><td><strong>{row.race_name}</strong></td><td>{row.race_date ?? '–'}</td><td>{row.regional_participants}</td><td>{row.all_participants}</td><td>{row.regional_clubs}</td><td>{row.regional_classes}</td><td>{pct(row.shooting_percentage)}</td></tr>)}</tbody></table></div></section>
         </>}
       </section>;
     })}
