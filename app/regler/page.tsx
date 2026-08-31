@@ -16,23 +16,30 @@ const placementPoints = [
 
 type Region = { id: string; name: string; sort_order: number };
 
+function isSouthRegion(name?: string) {
+  const normalized = name?.trim().toLocaleLowerCase('sv-SE');
+  return normalized === 'syd' || normalized === 'region syd';
+}
+
 export default async function RulesPage({ searchParams }: { searchParams: Promise<Record<string,string|undefined>> }) {
   const params = await searchParams;
   const supabase = await createClient();
   const { data: regionRows } = await supabase.from('regions').select('id,name,sort_order').order('sort_order');
   const regions = (regionRows ?? []) as Region[];
-  const south = regions.find(region => region.name === 'Region Syd');
+  const south = regions.find(region => isSouthRegion(region.name));
   const selectedRegionId = regions.some(region => region.id === params.region)
     ? params.region!
     : south?.id ?? regions[0]?.id;
   const selectedRegion = regions.find(region => region.id === selectedRegionId);
-  const isSouth = selectedRegion?.name === 'Region Syd';
+  const isSouth = isSouthRegion(selectedRegion?.name);
 
   return <>
     <section className="hero compact-hero">
       <p className="eyebrow">{selectedRegion?.name ?? 'Cupregler'}</p>
-      <h1>Cupregler</h1>
-      <p>Välj region för att se vilka regler som gäller för den regionala cupen.</p>
+      <h1>{isSouth ? 'Regler för Syd Cup' : 'Cupregler'}</h1>
+      <p>{isSouth
+        ? 'Så räknas den individuella cupen, klubbarnas poängkamp och medaljliga. Reglerna bygger på Region Syds cupregler och de kompletteringar som gäller för sammanställningen.'
+        : 'Välj region för att se vilka regler som gäller för den regionala cupen.'}</p>
     </section>
 
     {regions.length > 0 && <RulesRegionSelector regions={regions} selectedRegionId={selectedRegionId} />}
