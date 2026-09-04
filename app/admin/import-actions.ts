@@ -122,8 +122,9 @@ export async function importRaceResultsSafe(formData: FormData) {
         const { data: created, error } = await supabase.from('athletes')
           .insert({ full_name: item.row.athleteName, club_id: item.clubId }).select('id').single();
         if (error || !created) throw error ?? new Error(`Åkaren ${item.row.athleteName} kunde inte sparas.`);
-        athleteId = created.id;
-        athleteIds.set(item.athleteKey, athleteId);
+        const createdAthleteId = created.id;
+        athleteId = createdAthleteId;
+        athleteIds.set(item.athleteKey, createdAthleteId);
       }
 
       const { error } = await supabase.from('results').upsert({
