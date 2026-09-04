@@ -1,7 +1,8 @@
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
-import { addClassAlias, createCup, createRace, createSeason, importRaceResults, logout, setRaceStatus } from './admin-actions';
+import { addClassAlias, createCup, createRace, createSeason, logout, setRaceStatus } from './admin-actions';
+import { importRaceResultsSafe } from './import-actions';
 import ClubManager from './club-manager';
 
 export const dynamic = 'force-dynamic';
@@ -99,6 +100,6 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       initialClubId={params.club}
     />}
 
-    {section === 'import' && <section className="card admin-workspace"><h2>Import & publicering</h2><div className="import-list">{(races??[]).map(r=><article className="import-card" key={r.id}><div><strong>{r.name}</strong><p className="muted import-meta">{cupNameById.get(r.cup_id) ?? 'Cup saknas'} · {r.race_date??'Datum saknas'}</p><span className="badge">{r.import_status==='imported'?`${r.imported_result_count} importerade`:r.import_status==='failed'?'Importfel':'Inte importerad'}</span>{r.import_error&&<p className="error-text">{r.import_error}</p>}</div><div className="import-actions"><form action={importRaceResults}><input type="hidden" name="race_id" value={r.id}/><button type="submit">Importera</button></form><form action={setRaceStatus}><input type="hidden" name="race_id" value={r.id}/><input type="hidden" name="status" value={r.status==='published'?'draft':'published'}/><button className="secondary-dark" type="submit">{r.status==='published'?'Avpublicera':'Publicera'}</button></form></div></article>)}</div></section>}
+    {section === 'import' && <section className="card admin-workspace"><h2>Import & publicering</h2><div className="import-list">{(races??[]).map(r=><article className="import-card" key={r.id}><div><strong>{r.name}</strong><p className="muted import-meta">{cupNameById.get(r.cup_id) ?? 'Cup saknas'} · {r.race_date??'Datum saknas'}</p><span className="badge">{r.import_status==='imported'?`${r.imported_result_count} importerade`:r.import_status==='failed'?'Importfel':'Inte importerad'}</span>{r.import_error&&<p className="error-text">{r.import_error}</p>}</div><div className="import-actions"><form action={importRaceResultsSafe}><input type="hidden" name="race_id" value={r.id}/><button type="submit">Importera</button></form><form action={setRaceStatus}><input type="hidden" name="race_id" value={r.id}/><input type="hidden" name="status" value={r.status==='published'?'draft':'published'}/><button className="secondary-dark" type="submit">{r.status==='published'?'Avpublicera':'Publicera'}</button></form></div></article>)}</div></section>}
   </>;
 }
