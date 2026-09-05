@@ -5,30 +5,38 @@
 - PDF
 - Sök
 
-### v1.1.8 – Import Safety & Idempotency
+### v1.1.8 – Import Safety & Idempotency ✅
 
-- Säkerställ att återimport av samma tävling inte skapar dubbletter eller oavsiktliga ändringar.
-- Verifiera säker hantering av felaktig eller tvetydig matchning av åkare, förening och klass.
-- Granska importflöde och adminhantering innan eventuella ändringar görs.
+- Återimport av samma tävling verifierad utan dubbletter eller oavsiktliga ändringar.
+- Säker hantering av felaktig eller tvetydig matchning av åkare, förening och klass verifierad.
+- Importflöde och adminhantering genomgångna och verifierade.
 
 ### v1.1.9 – Feedback & Scoring Review
 
 Prioriterade kontrollpunkter och förbättringar från användarfeedback:
 
-1. **FP Nybörjare – 5 poäng per start**
-   - Verifiera mot gällande regelverk.
-   - Implementera 5 deltagarpoäng per giltig start om regeln bekräftas.
+1. **Poängregler för Nybörjare och 10–11 ✅**
+   - Flickor Nybörjare: 0 cup-poäng.
+   - Pojkar Nybörjare: 0 cup-poäng.
+   - Flickor 10–11: 5 deltagarpoäng per giltigt regionalt resultat.
+   - Pojkar 10–11: 5 deltagarpoäng per giltigt regionalt resultat.
+   - Övriga klasser behåller ordinarie Syd Cup-poäng efter regional placering.
 
-2. **Öppen Klass – poäng**
-   - Verifiera mot officiella regler innan någon ändring görs.
-   - Nuvarande lokala regel är 1 deltagarpoäng per giltig start och inga medaljpoäng.
+2. **Öppen Klass – poäng ✅**
+   - Öppen Klass ger 0 cup-poäng.
+   - Öppen Klass ger inga medaljer eller medaljpoäng.
 
-3. **Träffprocent vid strukna resultat**
-   - Utred om skjutresultat från individuellt strukna tävlingar ska ingå i generell statistik.
-   - Håll isär generell statistik och träffprocent som används som skiljekriterium i cupställningen.
+3. **Träffprocent vid strukna resultat ✅**
+   - Cupställningens skiljekriterium använder endast skjutresultat från deltävlingar som räknas i den individuella cupen.
+   - Generell tävlingsstatistik använder alla giltiga resultat i respektive publicerad deltävling.
+   - Ingen kodändring krävdes efter verifiering.
 
-4. **Individuellt – horisontell scrollbar**
-   - Fixa responsiv layout/overflow när en åkare fälls ut så att horisontell scrollbar inte ligger kvar när innehållet får plats.
+4. **Individuellt – horisontell scrollbar ✅**
+   - Responsiv layout för expanderad åkare korrigerad så att detaljtabellen inte tvingar huvudtabellen bredare än nödvändigt.
+
+5. **Result Review och regelinformation ✅**
+   - Result Review använder samma poängkälla som cupens scoring engine.
+   - Regelsidan är uppdaterad med de särskilda reglerna för Nybörjare, 10–11 och Öppen Klass.
 
 ### Future Rules / SydCup 2027
 
