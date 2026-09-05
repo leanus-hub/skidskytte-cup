@@ -40,6 +40,12 @@ function addUnique<T extends { id: string }>(map: Map<string, T | null>, key: st
   else if (current && current.id !== row.id) map.set(key, null);
 }
 
+function errorMessage(error: unknown) {
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'object' && error !== null && 'message' in error && typeof error.message === 'string') return error.message;
+  return 'Okänt importfel';
+}
+
 type PlannedResult = {
   row: Awaited<ReturnType<typeof import('@/lib/biathlontiming').importBiathlonTiming>>['results'][number];
   classId: string;
@@ -57,7 +63,9 @@ export async function importRaceResultsSafe(formData: FormData) {
     .select('id,external_race_id,source_url').eq('id', databaseRaceId).single();
   if (raceError || !race) redirect('/admin?section=import&error=race-not-found');
 
-  await supabase.from('races').update({ import_status: 'processing', import_error: null }).eq('id', race.id);
+  const { error: processingError } = await supabase.from('races')
+    .update({ import_status: 'processing', import_error: null }).eq('id', race.id);
+  if (processingError) redirect(`/admin?section=import&error=${encodeURIComponent(errorMessage(processingError))}`);
 
   let importedCount = 0;
   let outsideCount = 0;
@@ -138,14 +146,19 @@ export async function importRaceResultsSafe(formData: FormData) {
       importedCount += 1;
     }
 
-    await supabase.from('races').update({
-      import_status: 'success', import_error: null, imported_result_count: importedCount,
+    const { error: successError } = await supabase.from('races').update({
+      import_status: 'imported', import_error: null, imported_result_count: importedCount,
       imported_at: new Date().toISOString(),
     }).eq('id', race.id);
+    if (successError) throw successError;
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Okänt importfel';
-    await supabase.from('races').update({ import_status: 'error', import_error: message }).eq('id', race.id);
-    redirect(`/admin?section=import&error=${encodeURIComponent(message)}`);
+    const message = errorMessage(error);
+    const { error: failedStatusError } = await supabase.from('races')
+      .update({ import_status: 'failed', import_error: message }).eq('id', race.id);
+    const visibleMessage = failedStatusError
+      ? `${message} (Dessutom kunde importstatus inte sparas: ${errorMessage(failedStatusError)})`
+      : message;
+    redirect(`/admin?section=import&error=${encodeURIComponent(visibleMessage)}`);
   }
 
   revalidatePath('/');
