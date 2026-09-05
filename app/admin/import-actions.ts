@@ -140,7 +140,6 @@ export async function importRaceResultsSafe(formData: FormData) {
         bib: item.row.bib, place: item.row.place, status: item.row.status,
         total_time_ms: item.row.totalTimeMs, shooting: item.row.shooting,
         shooting_hits: item.row.shootingHits, shooting_shots: item.row.shootingShots,
-        source_class_name: item.row.className, source_club_name: item.row.clubName,
       }, { onConflict: 'race_id,class_id,athlete_id' });
       if (error) throw error;
       importedCount += 1;
