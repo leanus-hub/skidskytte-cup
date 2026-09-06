@@ -45,6 +45,10 @@ Följande är regelidéer för utvärdering och ska inte implementeras utan sepa
 - **Klubbkamp – aktiva åkare:** utvärdera om endast åkare med minst 3 starter ska bidra till klubbkampen.
 - **Klubbkamp – tävlingens bredd:** utvärdera om endast deltävlingar med minst ett bestämt antal representerade föreningar, exempelvis 5, ska räknas.
 
+### Future Platform Capability
+
+- **Valbart regelverk per cup:** varje cup ska kunna kopplas till ett specifikt regelverk i stället för att poäng-, stryk-, behörighets- och skiljekriterier är hårdkodade globalt. Detta ska möjliggöra att olika cuper kan använda olika regler parallellt utan att påverka varandra.
+
 ## v2.0
 
 - API
