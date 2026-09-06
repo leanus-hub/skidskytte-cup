@@ -65,7 +65,9 @@ export default async function RulesPage({ searchParams }: { searchParams: Promis
           <div className="table-scroll"><table><thead><tr><th>Placering</th><th>Poäng</th></tr></thead><tbody>
             {placementPoints.map(([place, points]) => <tr key={place}><td>{place}</td><td><strong>{points}</strong></td></tr>)}
           </tbody></table></div>
-          <p><strong>Öppen Klass:</strong> varje giltigt deltagande ger 1 deltagarpoäng oavsett placering.</p>
+          <p><strong>Flickor och Pojkar 10–11:</strong> varje giltigt regionalt resultat ger <strong>5 deltagarpoäng</strong> oavsett placering.</p>
+          <p><strong>Flickor och Pojkar Nybörjare:</strong> inga cup-poäng delas ut.</p>
+          <p><strong>Öppen Klass:</strong> inga cup-poäng delas ut.</p>
         </section>
 
         <section className="card rules-card">
@@ -78,7 +80,7 @@ export default async function RulesPage({ searchParams }: { searchParams: Promis
         <section className="card rules-card">
           <p className="eyebrow dark">Klubbkamp</p><h2>Klubbarnas poängliga</h2>
           <p>I klubbarnas poängkamp räknas <strong>alla giltiga deltaganden</strong>. Ett resultat som stryks ur en åkares individuella cupresultat fortsätter alltså att bidra med sina deltävlingpoäng till föreningen.</p>
-          <p>Öppen Klass bidrar med <strong>1 poäng per giltigt deltagande</strong> till klubbens poängliga.</p>
+          <p>Flickor och Pojkar 10–11 bidrar med <strong>5 poäng per giltigt regionalt resultat</strong>. Flickor och Pojkar Nybörjare samt Öppen Klass bidrar med <strong>0 poäng</strong>.</p>
         </section>
 
         <section className="card rules-card">
@@ -102,7 +104,7 @@ export default async function RulesPage({ searchParams }: { searchParams: Promis
 
       <section className="card section-gap">
         <h2>Officiella regler</h2>
-        <p>Grundreglerna för Syd Cup publiceras av Svenska Skidskytteförbundet, Region Syd. Den här sidan kompletterar dem med reglerna för Öppen Klass samt klubbarnas poäng- och medaljliga.</p>
+        <p>Grundreglerna för Syd Cup publiceras av Svenska Skidskytteförbundet, Region Syd. Den här sidan kompletterar dem med de särskilda poängreglerna för 10–11, Nybörjare och Öppen Klass samt klubbarnas poäng- och medaljliga.</p>
         <a className="text-link" href="https://www.skidskytte.se/rsssf/aktiviteter/syd-cup/regler-for-syd-cup" target="_blank" rel="noreferrer">Läs Region Syds officiella regler ↗</a>
       </section>
     </>}
