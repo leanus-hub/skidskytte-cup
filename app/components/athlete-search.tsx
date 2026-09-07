@@ -34,8 +34,8 @@ export default function AthleteSearch({ initialValue = '' }: { initialValue?: st
   }
 
   return (
-    <section className="athlete-search" aria-label="Sök åkare">
-      <div className="athlete-search-field">
+    <section className="selector-panel" aria-label="Sök åkare">
+      <div className="selector-field">
         <label htmlFor="athlete-search">Sök åkare</label>
         <input
           id="athlete-search"
@@ -46,7 +46,15 @@ export default function AthleteSearch({ initialValue = '' }: { initialValue?: st
           onChange={event => setValue(event.target.value)}
         />
       </div>
-      {value && <button type="button" className="secondary-dark" onClick={clearSearch}>Rensa</button>}
+      <button
+        type="button"
+        className="secondary-dark"
+        onClick={clearSearch}
+        disabled={!value}
+        style={{ alignSelf: 'end' }}
+      >
+        Rensa sökning
+      </button>
     </section>
   );
 }
