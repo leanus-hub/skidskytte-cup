@@ -48,6 +48,8 @@ Följande är regelidéer för utvärdering och ska inte implementeras utan sepa
 ### Future Platform Capability
 
 - **Valbart regelverk per cup:** varje cup ska kunna kopplas till ett specifikt regelverk i stället för att poäng-, stryk-, behörighets- och skiljekriterier är hårdkodade globalt. Detta ska möjliggöra att olika cuper kan använda olika regler parallellt utan att påverka varandra.
+- **Planerade tävlingar utan resultat:** administratörer ska kunna lägga upp kommande deltävlingar i en cup innan resultat finns, så att cupens kalender och planerade program kan visas publikt i förväg.
+- **Excel-import för förbund och SweCup:** stöd för att importera tävlings- och resultatdata från Excel som komplement till API/importflöden, särskilt för Biathlon Cup/SweCup och framtida samarbete med Svenska Skidskytteförbundet.
 
 ## v2.0
 
