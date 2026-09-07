@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import SummarySelector from './components/summary-selector';
+import AthleteSearch from './components/athlete-search';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,6 +35,8 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const params = await searchParams;
   const view = ['individual','class','club','statistics'].includes(params.view ?? '') ? params.view! : 'individual';
   const clubView = params.clubView === 'medals' ? 'medals' : 'points';
+  const athleteQuery = (params.q ?? '').trim();
+  const normalizedAthleteQuery = athleteQuery.toLocaleLowerCase('sv-SE');
   const supabase = await createClient();
   const [{data:regionRows,error:regionsError},{data:cupRows,error:cupsError},{data:standings,error},{data:breakdown},{data:classRows},{data:clubRows},{data:raceStats}] = await Promise.all([
     supabase.from('regions').select('id,name,sort_order').order('sort_order'),
@@ -82,13 +85,14 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
       selectedCupId={selectedCupId}
     />}
 
-
     <nav className="summary-tabs" aria-label="Sammanställning">
       <Link className={view==='individual'?'active':''} href={href({region:selectedRegionId,cup:selectedCupId,view:'individual'})}>Individuellt</Link>
       <Link className={view==='class'?'active':''} href={href({region:selectedRegionId,cup:selectedCupId,view:'class'})}>Klasser</Link>
       <Link className={view==='club'?'active':''} href={href({region:selectedRegionId,cup:selectedCupId,view:'club',clubView})}>Klubbar</Link>
       <Link className={view==='statistics'?'active':''} href={href({region:selectedRegionId,cup:selectedCupId,view:'statistics'})}>Cupstatistik</Link>
     </nav>
+
+    {view==='individual' && <AthleteSearch initialValue={athleteQuery} />}
 
     {(regionsError || cupsError) && <div className="card"><h2>Regioner eller cuper kunde inte hämtas</h2><p className="muted">Försök igen senare. Om problemet kvarstår, kontakta administratören.</p></div>}
     {error && <div className="card"><h2>Cupresultaten kunde inte hämtas</h2><p className="muted">Försök igen senare. Om problemet kvarstår, kontakta administratören.</p></div>}
@@ -99,6 +103,9 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
       const meta = individual.find(r=>r.cup_id===cupId) ?? classes.find(r=>r.cup_id===cupId) ?? clubs.find(r=>r.cup_id===cupId) ?? statistics.find(r=>r.cup_id===cupId);
       const cupStatistics = statistics.filter(r=>r.cup_id===cupId);
       const cupIndividuals = individual.filter(r=>r.cup_id===cupId);
+      const filteredCupIndividuals = normalizedAthleteQuery
+        ? cupIndividuals.filter(row => row.athlete_name.toLocaleLowerCase('sv-SE').includes(normalizedAthleteQuery))
+        : cupIndividuals;
       const cupClasses = classes.filter(r=>r.cup_id===cupId);
       const cupClubs = clubs.filter(r=>r.cup_id===cupId);
       const biggestRace = [...cupStatistics].sort((a,b)=>b.regional_participants-a.regional_participants || a.sort_order-b.sort_order)[0];
@@ -124,12 +131,13 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         </section>
 
         {view==='individual' && cupIndividuals.length === 0 && <div className="card empty-state"><h3>Inga publicerade individuella resultat ännu</h3><p className="muted">Cupen är korrekt kopplad till regionen, men sammanställningen innehåller ännu inga rader. Kontrollera att en tävling är importerad och publicerad.</p></div>}
+        {view==='individual' && cupIndividuals.length > 0 && athleteQuery && filteredCupIndividuals.length === 0 && <div className="card empty-state"><h3>Ingen åkare hittades</h3><p className="muted">Ingen åkare i den valda cupen matchar “{athleteQuery}”. Prova ett annat namn eller rensa sökningen.</p></div>}
         {view==='class' && cupClasses.length === 0 && <div className="card empty-state"><h3>Ingen klassammanställning ännu</h3><p className="muted">Publicera minst en importerad deltävling för cupen.</p></div>}
         {view==='club' && cupClubs.length === 0 && <div className="card empty-state"><h3>Ingen klubbsammanställning ännu</h3><p className="muted">Klubbpoäng visas när publicerade resultat finns.</p></div>}
         {view==='statistics' && cupStatistics.length === 0 && <div className="card empty-state"><h3>Ingen cupstatistik ännu</h3><p className="muted">Statistik visas när cupens deltävlingar har importerats och publicerats.</p></div>}
 
-        {view==='individual' && Array.from(new Set(individual.filter(r=>r.cup_id===cupId).map(r=>r.class_name))).map(className => {
-          const rows=individual.filter(r=>r.cup_id===cupId&&r.class_name===className);
+        {view==='individual' && Array.from(new Set(filteredCupIndividuals.map(r=>r.class_name))).map(className => {
+          const rows=filteredCupIndividuals.filter(r=>r.class_name===className);
           return <section key={className} className="card standings-card"><h3>{className}</h3><div className="table-scroll"><table>
             <thead><tr><th>Plats</th><th>Åkare</th><th>Klubb</th><th>Poäng</th><th>Skytte</th><th>Starter</th><th>Pris</th></tr></thead>
             <tbody>{rows.map(row => <tr key={`${row.class_id}-${row.athlete_id}`}><td><strong>{row.cup_place}</strong></td><td><details><summary>{row.athlete_name}</summary><div className="result-detail"><table><thead><tr><th>Deltävling</th><th>Plac.</th><th>Poäng</th><th>Skytte</th><th>Räknas</th></tr></thead><tbody>{details.filter(d=>d.cup_id===row.cup_id&&d.class_id===row.class_id&&d.athlete_id===row.athlete_id).map(result=><tr key={result.race_id} className={result.is_counted?'':'dropped'}><td>{result.race_name}</td><td>{result.region_place}</td><td>{result.cup_points}</td><td>{shootingLabel(result)}</td><td>{result.is_counted?'Ja':'Struken'}</td></tr>)}</tbody></table></div></details></td><td>{row.club_name}</td><td><strong>{row.total_points}</strong></td><td>{pct(row.shooting_percentage)}</td><td>{row.races_participated} ({row.races_counted} räknas)</td><td>{row.eligible_for_prize?<span className="badge success-badge">Kvalificerad</span>:<span className="badge">Minst 3 krävs</span>}</td></tr>)}</tbody>
