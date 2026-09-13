@@ -88,7 +88,8 @@ export async function createRace(formData: FormData) {
   try {
     const parsed = new URL(sourceUrl);
     raceId = parsed.searchParams.get('raceId')?.trim() ?? '';
-    if (parsed.hostname !== 'results.biathlontiming.se' || !raceId) throw new Error();
+    const isBiathlonTimingHost = /^results\d*\.biathlontiming\.se$/i.test(parsed.hostname);
+    if (!isBiathlonTimingHost || !raceId) throw new Error();
   } catch {
     redirect('/admin?section=race&error=invalid-race-url');
   }
