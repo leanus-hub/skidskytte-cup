@@ -227,6 +227,7 @@ async function fetchSource(url: string) {
 
 export async function importBiathlonTiming(raceId: string, sourceUrl: string): Promise<ImportedRace> {
   const candidates = [
+    `https://biathlontiming-standalone-hmgjcqg8fabaf8fk.westeurope-01.azurewebsites.net/rest/results/${encodeURIComponent(raceId)}`,
     `https://biathlontiming-cdn-endpoint.azureedge.net/rest/results/${encodeURIComponent(raceId)}`,
     sourceUrl,
   ];
