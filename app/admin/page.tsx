@@ -39,6 +39,23 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     clubs = data ?? [];
   }
 
+  const reviewSummaryByRace = new Map<string, { info: number; needsReview: number }>();
+  if (section === 'import') {
+    const { data: reviewRows, error: reviewError } = await supabase
+      .from('race_result_review')
+      .select('race_id,review_warning');
+    if (reviewError) throw new Error(`Kunde inte läsa resultatgranskning: ${reviewError.message}`);
+
+    for (const row of reviewRows ?? []) {
+      if (!row.review_warning) continue;
+      const current = reviewSummaryByRace.get(row.race_id) ?? { info: 0, needsReview: 0 };
+      const warning = String(row.review_warning);
+      if (warning === 'Status UNKNOWN') current.needsReview += 1;
+      else current.info += 1;
+      reviewSummaryByRace.set(row.race_id, current);
+    }
+  }
+
   const seasonNameById = new Map((seasons ?? []).map(season => [season.id, season.name]));
   const regionNameById = new Map((regions ?? []).map(region => [region.id, region.name]));
   const cupNameById = new Map((cups ?? []).map(cup => [cup.id, cup.name]));
@@ -100,6 +117,37 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       initialClubId={params.club}
     />}
 
-    {section === 'import' && <section className="card admin-workspace"><h2>Import & publicering</h2><div className="import-list">{(races??[]).map(r=><article className="import-card" key={r.id}><div><strong>{r.name}</strong><p className="muted import-meta">{cupNameById.get(r.cup_id) ?? 'Cup saknas'} · {r.race_date??'Datum saknas'}</p><span className="badge">{r.import_status==='imported'?`${r.imported_result_count} importerade`:r.import_status==='failed'?'Importfel':'Inte importerad'}</span>{r.import_error&&<p className="error-text">{r.import_error}</p>}</div><div className="import-actions"><form action={importRaceResultsSafe}><input type="hidden" name="race_id" value={r.id}/><button type="submit">Importera</button></form><form action={setRaceStatus}><input type="hidden" name="race_id" value={r.id}/><input type="hidden" name="status" value={r.status==='published'?'draft':'published'}/><button className="secondary-dark" type="submit">{r.status==='published'?'Avpublicera':'Publicera'}</button></form></div></article>)}</div></section>}
+    {section === 'import' && <section className="card admin-workspace">
+      <h2>Import & publicering</h2>
+      <p className="muted">Importera först, granska därefter resultat och cup-poäng innan tävlingen publiceras. DNS, DNF och resultat utanför cupens region visas som information; UNKNOWN kräver kontroll.</p>
+      <div className="import-list">{(races??[]).map(r => {
+        const review = reviewSummaryByRace.get(r.id) ?? { info: 0, needsReview: 0 };
+        const imported = r.import_status === 'imported';
+        const failed = r.import_status === 'failed';
+        const canPublish = imported && review.needsReview === 0;
+        return <article className="import-card" key={r.id}>
+          <div>
+            <strong>{r.name}</strong>
+            <p className="muted import-meta">{cupNameById.get(r.cup_id) ?? 'Cup saknas'} · {r.race_date ?? 'Datum saknas'}</p>
+            <span className="badge">{imported ? `${r.imported_result_count ?? 0} importerade` : failed ? 'Importfel' : 'Inte importerad'}</span>
+            {imported && review.needsReview > 0 && <p className="error-text"><strong>{review.needsReview} behöver kontrolleras</strong> före publicering.</p>}
+            {imported && review.info > 0 && <p className="muted">{review.info} informationsnoteringar (t.ex. DNS, DNF eller utanför region).</p>}
+            {imported && review.needsReview === 0 && <p className="muted">Granskningskontroll: inga blockerande varningar.</p>}
+            {r.import_error && <p className="error-text">{r.import_error}</p>}
+          </div>
+          <div className="import-actions">
+            <form action={importRaceResultsSafe}><input type="hidden" name="race_id" value={r.id}/><button type="submit">{imported ? 'Återimportera' : 'Importera'}</button></form>
+            {imported && <Link className="source-button" href={`/admin/races/${r.id}`}>Granska resultat</Link>}
+            <form action={setRaceStatus}>
+              <input type="hidden" name="race_id" value={r.id}/>
+              <input type="hidden" name="status" value={r.status === 'published' ? 'draft' : 'published'}/>
+              <button className="secondary-dark" type="submit" disabled={r.status !== 'published' && !canPublish} title={r.status !== 'published' && !canPublish ? 'Importera resultat och åtgärda blockerande varningar före publicering.' : undefined}>
+                {r.status === 'published' ? 'Avpublicera' : 'Publicera'}
+              </button>
+            </form>
+          </div>
+        </article>;
+      })}</div>
+    </section>}
   </>;
 }
