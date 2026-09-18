@@ -160,7 +160,15 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
             {r.import_error && <p className="error-text">{r.import_error}</p>}
           </div>
           <div className="import-actions">
-            <form action={importRaceResultsSafe}><input type="hidden" name="race_id" value={r.id}/><button type="submit">{imported ? 'Återimportera' : 'Importera'}</button></form>
+            {imported && <details>
+              <summary className="source-button">Återimportera</summary>
+              <div className="card">
+                <p><strong>Säker återimport</strong></p>
+                <p className="muted">{r.imported_result_count ?? 0} befintliga resultat finns. Matchande resultat uppdateras – de dupliceras inte. Om ett tidigare resultat saknas i källan stoppas importen utan radering.</p>
+                <form action={importRaceResultsSafe}><input type="hidden" name="race_id" value={r.id}/><button type="submit">Bekräfta återimport</button></form>
+              </div>
+            </details>}
+            {!imported && <form action={importRaceResultsSafe}><input type="hidden" name="race_id" value={r.id}/><button type="submit">Importera</button></form>}
             {imported && <Link className="source-button" href={`/admin/races/${r.id}`}>Granska resultat</Link>}
             <form action={setRaceStatus}>
               <input type="hidden" name="race_id" value={r.id}/>
