@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
-import { addClassAlias, createCup, createRace, createSeason, inviteAdmin, logout, setAdminRole, setRaceStatus } from './admin-actions';
+import { addClassAlias, createCup, createRace, createSeason, inviteAdmin, logout, setAdminRole, setRaceStatus, updatePlannedRace, movePlannedRace } from './admin-actions';
 import { importRaceResultsSafe } from './import-actions';
 import ClubManager from './club-manager';
 import CupPlanBuilder from './cup-plan-builder';
@@ -65,6 +65,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
 
   const seasonNameById = new Map((seasons ?? []).map(season => [season.id, season.name]));
   const regionNameById = new Map((regions ?? []).map(region => [region.id, region.name]));
+  const clubNameById = new Map(clubs.map(club => [club.id, club.name]));
   const cupNameById = new Map((cups ?? []).map(cup => [cup.id, cup.name]));
 
   const nav = [
@@ -120,9 +121,17 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
         <div className="season-plan-existing">
           <h3>Nuvarande tävlingsplan</h3>
           {(races??[]).filter(r=>r.cup_id===params.cup).sort((a,b)=>(a.sort_order??0)-(b.sort_order??0)).length===0 && <p className="muted">Inga deltävlingar upplagda ännu.</p>}
-          {(races??[]).filter(r=>r.cup_id===params.cup).sort((a,b)=>(a.sort_order??0)-(b.sort_order??0)).map((r,index)=><article className="season-plan-item" key={r.id}>
-            <span className="plan-number">{index+1}</span><div><strong>{r.name}</strong><p>{r.race_date??'Datum ej satt'}{r.location?` · ${r.location}`:''}</p></div>
-            <span className={`badge ${r.status==='published'?'success-badge':''}`}>{r.status==='published'?'Publicerad':r.import_status==='imported'?'Importerad':r.source_url?'Redo för import':'Planerad'}</span>
+          {(races??[]).filter(r=>r.cup_id===params.cup).sort((a,b)=>(a.sort_order??0)-(b.sort_order??0)).map((r,index,arr)=><article className="season-plan-item editable" key={r.id}>
+            <span className="plan-number">{index+1}</span>
+            <div className="plan-item-main"><div><strong>{r.name}</strong><p>{r.race_date??'Datum ej satt'}{r.location?` · ${r.location}`:''}{r.organizer_club_id?` · ${clubNameById.get(r.organizer_club_id)??'Arrangör'}`:''}</p></div>
+            <div className="plan-item-actions"><form action={movePlannedRace}><input type="hidden" name="race_id" value={r.id}/><input type="hidden" name="cup_id" value={params.cup}/><input type="hidden" name="direction" value="up"/><button className="icon-button" disabled={index===0} title="Flytta upp">↑</button></form><form action={movePlannedRace}><input type="hidden" name="race_id" value={r.id}/><input type="hidden" name="cup_id" value={params.cup}/><input type="hidden" name="direction" value="down"/><button className="icon-button" disabled={index===arr.length-1} title="Flytta ner">↓</button></form></div></div>
+            <span className={`badge ${r.status==='published'?'success-badge':''}`}>{r.status==='cancelled'?'Inställd':r.status==='published'?'Publicerad':r.import_status==='imported'?'Importerad':r.source_url?'Redo för import':'Planerad'}</span>
+            <details className="plan-edit"><summary>Redigera</summary><form action={updatePlannedRace} className="plan-edit-form"><input type="hidden" name="race_id" value={r.id}/><input type="hidden" name="cup_id" value={params.cup}/>
+              <label>Namn<input name="name" defaultValue={r.name} required/></label><label>Datum<input name="race_date" type="date" defaultValue={r.race_date??''}/></label><label>Ort<input name="location" defaultValue={r.location??''}/></label>
+              <label>Arrangör<select name="organizer_club_id" defaultValue={r.organizer_club_id??''}><option value="">Välj klubb</option>{clubs.map(club=><option value={club.id} key={club.id}>{club.name}</option>)}</select></label>
+              <label className="plan-source">BiathlonTiming-länk<input name="source_url" type="url" defaultValue={r.source_url??''} placeholder="https://results.biathlontiming.se/?raceId=..."/></label>
+              <label className="check-row"><input type="checkbox" name="cancelled" value="true" defaultChecked={r.status==='cancelled'}/> Inställd tävling</label><button type="submit">Spara ändringar</button>
+            </form></details>
           </article>)}
         </div>
         <CupPlanBuilder cupId={params.cup} clubs={clubs.map(c=>({id:c.id,name:c.name}))}/>
