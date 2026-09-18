@@ -198,3 +198,16 @@ tr.league-podium td:first-child { box-shadow:inset 4px 0 0 var(--yellow); }
   .standings-card th, .standings-card td { padding:9px 8px; }
   .club-medal-summary { font-size:.72rem; }
 }
+
+.athlete-summary { display:flex; flex-wrap:wrap; gap:7px; margin:10px 0 2px; }
+.athlete-summary span { background:var(--accent-soft); color:var(--accent-dark); border-radius:999px; padding:6px 9px; font-size:.78rem; font-weight:700; }
+.points-gap, .starts-detail { display:block; margin-top:3px; color:var(--muted); font-size:.74rem; font-weight:600; white-space:nowrap; }
+.counted-result { color:var(--accent); font-weight:800; white-space:nowrap; }
+tr.individual-podium > td { background:#fffdf4; }
+tr.individual-podium > td:first-child { box-shadow:inset 4px 0 0 var(--yellow); }
+@media (max-width:600px) {
+  .athlete-summary { gap:5px; }
+  .athlete-summary span { font-size:.72rem; padding:5px 7px; }
+  .result-detail { padding:7px; }
+  .result-detail table { min-width:480px; }
+}
