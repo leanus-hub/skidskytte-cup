@@ -245,3 +245,20 @@ tr.outside-region td { color:var(--muted); background:#f7f8fa; }
 .club-ranks span { display:grid; text-align:center; gap:3px; padding:9px 12px; border-radius:10px; background:var(--accent-dark); color:#fff; font-size:.72rem; }
 .club-ranks strong { font-size:1.15rem; }
 @media(max-width:650px){.club-cup-heading{flex-direction:column}.club-ranks{justify-content:flex-start}}
+
+.plan-cup-selector { display:grid; grid-template-columns:minmax(220px,1fr) auto; gap:10px; align-items:end; margin-bottom:22px; }
+.plan-cup-selector label { grid-column:1/-1; margin:0; }
+.season-plan-existing { margin:18px 0 26px; }
+.season-plan-item { display:grid; grid-template-columns:38px minmax(0,1fr) auto; align-items:center; gap:12px; padding:11px 8px; border-bottom:1px solid var(--border); }
+.season-plan-item p { margin:3px 0 0; color:var(--muted); font-size:.82rem; }
+.plan-number { width:30px; height:30px; border-radius:50%; display:grid; place-items:center; background:var(--accent-dark); color:#fff; font-weight:800; font-size:.8rem; }
+.cup-plan-builder { border-top:2px solid var(--border); padding-top:22px; }
+.plan-toolbar,.plan-footer { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:14px; }
+.plan-toolbar p { margin:4px 0 0; }
+.plan-grid { display:grid; grid-template-columns:32px minmax(180px,1.5fr) 145px minmax(110px,.7fr) minmax(160px,1fr) 34px; gap:8px; align-items:center; }
+.plan-head { padding:0 4px 6px; color:var(--muted); font-size:.72rem; font-weight:800; text-transform:uppercase; letter-spacing:.04em; }
+.plan-row { padding:7px 4px; border-top:1px solid var(--border); }
+.plan-row input,.plan-row select { margin:0; min-width:0; }
+.plan-remove { width:32px; min-height:32px; padding:0; border-radius:50%; background:transparent; color:var(--muted); font-size:1.3rem; }
+.plan-footer { margin:16px 0 0; }
+@media(max-width:850px){.plan-head{display:none}.plan-grid.plan-row{grid-template-columns:30px 1fr 34px}.plan-row input,.plan-row select{grid-column:2}.plan-row strong{grid-row:1}.plan-remove{grid-column:3;grid-row:1}.plan-row input:first-of-type{grid-row:1}.plan-footer{align-items:stretch;flex-direction:column}.plan-cup-selector{grid-template-columns:1fr}.plan-cup-selector label{grid-column:auto}}
