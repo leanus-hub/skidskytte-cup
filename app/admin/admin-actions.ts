@@ -109,6 +109,57 @@ export async function createPlannedRaces(formData: FormData) {
   redirect(`/admin?section=plan&cup=${encodeURIComponent(cupId)}&success=plan-saved`);
 }
 
+export async function updatePlannedRace(formData: FormData) {
+  const supabase = await requireAdmin();
+  const raceId = text(formData, 'race_id');
+  const cupId = text(formData, 'cup_id');
+  const name = text(formData, 'name');
+  const raceDate = text(formData, 'race_date') || null;
+  const location = text(formData, 'location') || null;
+  const organizerClubId = text(formData, 'organizer_club_id') || null;
+  const sourceUrl = text(formData, 'source_url');
+  const cancelled = text(formData, 'cancelled') === 'true';
+  if (!raceId || !cupId || !name) redirect('/admin?section=plan&error=race-fields');
+
+  let externalRaceId: string | null = null;
+  let normalizedSourceUrl: string | null = null;
+  if (sourceUrl) {
+    try {
+      const parsed = new URL(sourceUrl);
+      externalRaceId = parsed.searchParams.get('raceId')?.trim() ?? null;
+      if (!/^results\d*\.biathlontiming\.se$/i.test(parsed.hostname) || !externalRaceId) throw new Error();
+      normalizedSourceUrl = sourceUrl;
+    } catch { redirect(`/admin?section=plan&cup=${encodeURIComponent(cupId)}&error=invalid-race-url`); }
+  }
+
+  const { data: current } = await supabase.from('races').select('status').eq('id', raceId).single();
+  const status = cancelled ? 'cancelled' : current?.status === 'published' ? 'published' : 'draft';
+  const { error } = await supabase.from('races').update({
+    name, race_date: raceDate, location, organizer_club_id: organizerClubId,
+    source_url: normalizedSourceUrl, external_race_id: externalRaceId, status,
+  }).eq('id', raceId).eq('cup_id', cupId);
+  if (error) redirect(`/admin?section=plan&cup=${encodeURIComponent(cupId)}&error=${encodeURIComponent(error.message)}`);
+  revalidatePath('/admin'); revalidatePath('/');
+  redirect(`/admin?section=plan&cup=${encodeURIComponent(cupId)}&success=race-updated`);
+}
+
+export async function movePlannedRace(formData: FormData) {
+  const supabase = await requireAdmin();
+  const raceId = text(formData, 'race_id'), cupId = text(formData, 'cup_id'), direction = text(formData, 'direction');
+  if (!raceId || !cupId || !['up','down'].includes(direction)) redirect('/admin?section=plan&error=move-fields');
+  const { data } = await supabase.from('races').select('id,sort_order').eq('cup_id',cupId).order('sort_order');
+  const rows = data ?? [], index = rows.findIndex(r=>r.id===raceId), target = direction==='up'?index-1:index+1;
+  if (index>=0 && target>=0 && target<rows.length) {
+    const a=rows[index], b=rows[target];
+    const temp = -1000000 - Math.abs(a.sort_order ?? 0);
+    const e1=await supabase.from('races').update({sort_order:temp}).eq('id',a.id);
+    const e2=await supabase.from('races').update({sort_order:a.sort_order}).eq('id',b.id);
+    const e3=await supabase.from('races').update({sort_order:b.sort_order}).eq('id',a.id);
+    if(e1.error||e2.error||e3.error) redirect(`/admin?section=plan&cup=${encodeURIComponent(cupId)}&error=move-failed`);
+  }
+  revalidatePath('/admin'); redirect(`/admin?section=plan&cup=${encodeURIComponent(cupId)}&success=race-moved`);
+}
+
 export async function createRace(formData: FormData) {
   const supabase = await requireAdmin();
   const cupId = text(formData, 'cup_id');
