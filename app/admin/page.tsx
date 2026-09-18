@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
-import { addClassAlias, createCup, createRace, createSeason, logout, setAdminRole, setRaceStatus } from './admin-actions';
+import { addClassAlias, createCup, createRace, createSeason, inviteAdmin, logout, setAdminRole, setRaceStatus } from './admin-actions';
 import { importRaceResultsSafe } from './import-actions';
 import ClubManager from './club-manager';
 
@@ -125,7 +125,13 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
 
     {section === 'admins' && <section className="card admin-workspace">
       <h2>Administratörer</h2>
-      <p className="muted">Här kan en befintlig administratör ge eller ta bort administratörsbehörighet för befintliga användarkonton. Du kan inte ta bort din egen behörighet.</p>
+      <p className="muted">Bjud in en ny administratör via e-post eller ändra behörigheten för ett befintligt konto. Du kan inte ta bort din egen behörighet.</p>
+      <form action={inviteAdmin}>
+        <label htmlFor="admin_email">Bjud in ny administratör</label>
+        <input id="admin_email" name="email" type="email" autoComplete="email" required placeholder="namn@exempel.se" />
+        <button type="submit">Skicka admininbjudan</button>
+      </form>
+      <h3>Befintliga användare</h3>
       <div className="table-scroll"><table><thead><tr><th>Användare</th><th>Behörighet</th><th>Åtgärd</th></tr></thead><tbody>
         {adminProfiles.map(p => <tr key={p.id}>
           <td><strong>{p.display_name ?? 'Namnlöst konto'}</strong></td>
