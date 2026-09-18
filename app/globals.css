@@ -188,3 +188,13 @@ th { background: #edf3fb; color: var(--accent-dark); }
 
 .club-picker select { width: 100%; margin-bottom: 1rem; }
 .club-count { margin-top: .25rem; }
+
+.club-medal-summary { display:block; margin-top:4px; color:var(--muted); font-size:.78rem; font-weight:600; white-space:nowrap; }
+tr.league-podium td { background:#fffdf4; }
+tr.league-podium td:first-child { box-shadow:inset 4px 0 0 var(--yellow); }
+@media (max-width:600px) {
+  .standings-card { padding:16px; }
+  .standings-card table { font-size:.9rem; }
+  .standings-card th, .standings-card td { padding:9px 8px; }
+  .club-medal-summary { font-size:.72rem; }
+}
