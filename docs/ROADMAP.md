@@ -38,6 +38,14 @@ Prioriterade kontrollpunkter och förbättringar från användarfeedback:
    - Result Review använder samma poängkälla som cupens scoring engine.
    - Regelsidan är uppdaterad med de särskilda reglerna för Nybörjare, 10–11 och Öppen Klass.
 
+### v1.1.10 – Production Core & League UX ✅
+
+- Importflödet skiljer nu korrekt på klubbens region och den aktuella cupens region, inklusive regionen Utländsk.
+- Säker återimport har en tydlig bekräftelse och beskriver att matchande resultat uppdateras utan dubbletter.
+- Importfel för okänd/tvetydig klubb eller klass leder administratören vidare till rätt aliasverktyg.
+- Publika klubb- och medaljligor har förtydligade regler, medaljsammanfattning, poäng per start och förbättrad mobil presentation.
+- Import- och cupmotorns kärna betraktas som produktionsklar efter regression mot vintercupen.
+
 ### Future Rules / SydCup 2027
 
 Följande är regelidéer för utvärdering och ska inte implementeras utan separat beslut:
