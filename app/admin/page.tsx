@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
-import { addClassAlias, createCup, createRace, createSeason, logout, setRaceStatus } from './admin-actions';
+import { addClassAlias, createCup, createRace, createSeason, logout, setAdminRole, setRaceStatus } from './admin-actions';
 import { importRaceResultsSafe } from './import-actions';
 import ClubManager from './club-manager';
 
@@ -16,7 +16,7 @@ function adminHref(section: string, params: Record<string,string|undefined> = {}
 
 export default async function AdminPage({ searchParams }: { searchParams: Promise<Params> }) {
   const params = await searchParams;
-  const section = ['season','cup','race','import','classes','clubs'].includes(params.section ?? '') ? params.section! : 'home';
+  const section = ['season','cup','race','import','classes','clubs','admins'].includes(params.section ?? '') ? params.section! : 'home';
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect('/admin/login');
@@ -32,6 +32,12 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   ]);
 
   const selectedRegionId = params.region ?? regions?.[0]?.id ?? '';
+  let adminProfiles: { id: string; display_name: string | null; is_admin: boolean }[] = [];
+  if (section === 'admins') {
+    const { data, error } = await supabase.from('profiles').select('id,display_name,is_admin').order('display_name');
+    if (error) throw new Error(`Kunde inte läsa användare: ${error.message}`);
+    adminProfiles = data ?? [];
+  }
   let clubs: {id:string;name:string;short_name:string|null;aliases:string[]|null;region_id:string|null}[] = [];
   if (section === 'clubs') {
     const { data, error } = await supabase.from('clubs').select('id,name,short_name,aliases,region_id').order('name');
@@ -62,7 +68,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
 
   const nav = [
     ['home','Översikt'], ['season','Ny säsong'], ['cup','Ny cup'], ['race','Koppla tävling'],
-    ['import','Import & publicering'], ['classes','Klassalias'], ['clubs','Regioner & föreningar'],
+    ['import','Import & publicering'], ['classes','Klassalias'], ['clubs','Regioner & föreningar'], ['admins','Administratörer'],
   ];
 
   return <>
@@ -116,6 +122,18 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       initialRegionId={selectedRegionId}
       initialClubId={params.club}
     />}
+
+    {section === 'admins' && <section className="card admin-workspace">
+      <h2>Administratörer</h2>
+      <p className="muted">Här kan en befintlig administratör ge eller ta bort administratörsbehörighet för befintliga användarkonton. Du kan inte ta bort din egen behörighet.</p>
+      <div className="table-scroll"><table><thead><tr><th>Användare</th><th>Behörighet</th><th>Åtgärd</th></tr></thead><tbody>
+        {adminProfiles.map(p => <tr key={p.id}>
+          <td><strong>{p.display_name ?? 'Namnlöst konto'}</strong></td>
+          <td>{p.is_admin ? 'Administratör' : 'Användare'}</td>
+          <td><form action={setAdminRole}><input type="hidden" name="profile_id" value={p.id}/><input type="hidden" name="make_admin" value={p.is_admin ? 'false' : 'true'}/><button className="secondary-dark" type="submit">{p.is_admin ? 'Ta bort admin' : 'Gör till admin'}</button></form></td>
+        </tr>)}
+      </tbody></table></div>
+    </section>}
 
     {section === 'import' && <section className="card admin-workspace">
       <h2>Import & publicering</h2>
