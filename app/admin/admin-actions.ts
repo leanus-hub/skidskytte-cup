@@ -78,6 +78,37 @@ export async function createCup(formData: FormData) {
   redirect('/admin?section=cup&success=cup-created');
 }
 
+export async function createPlannedRaces(formData: FormData) {
+  const supabase = await requireAdmin();
+  const cupId = text(formData, 'cup_id');
+  const raw = text(formData, 'races_json');
+  if (!cupId || !raw) redirect('/admin?section=plan&error=plan-fields');
+
+  let rows: { name:string; race_date?:string; location?:string; organizer_club_id?:string }[] = [];
+  try { rows = JSON.parse(raw); } catch { redirect('/admin?section=plan&error=invalid-plan'); }
+  rows = rows.filter(row => row.name?.trim());
+  if (!rows.length) redirect('/admin?section=plan&error=no-races');
+
+  const { data: lastRace } = await supabase.from('races').select('sort_order').eq('cup_id', cupId).order('sort_order', { ascending:false }).limit(1).maybeSingle();
+  const start = lastRace?.sort_order ?? 0;
+  const payload = rows.map((row,index) => ({
+    cup_id: cupId,
+    name: row.name.trim(),
+    race_date: row.race_date || null,
+    location: row.location?.trim() || null,
+    organizer_club_id: row.organizer_club_id || null,
+    external_race_id: null,
+    source_url: null,
+    sort_order: start + index + 1,
+    status: 'draft',
+    import_status: 'not_imported',
+  }));
+  const { error } = await supabase.from('races').insert(payload);
+  if (error) redirect(`/admin?section=plan&cup=${encodeURIComponent(cupId)}&error=${encodeURIComponent(error.message)}`);
+  revalidatePath('/admin');
+  redirect(`/admin?section=plan&cup=${encodeURIComponent(cupId)}&success=plan-saved`);
+}
+
 export async function createRace(formData: FormData) {
   const supabase = await requireAdmin();
   const cupId = text(formData, 'cup_id');
