@@ -15,6 +15,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
             <Link className="brand" href="/">Regioncup Skidskytte</Link>
             <nav aria-label="Huvudmeny">
               <Link href="/">Ställning</Link>
+              <Link href="/akare">Sök åkare</Link>
               <Link href="/regler">Cupregler</Link>
               <Link href="/admin">Admin</Link>
             </nav>
