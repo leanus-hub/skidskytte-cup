@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
+import { headers } from 'next/headers';
 
 function text(formData: FormData, key: string) {
   return String(formData.get(key) ?? '').trim();
@@ -409,4 +410,49 @@ export async function importRaceResults(formData: FormData) {
   revalidatePath('/');
   revalidatePath('/admin');
   redirect(`/admin?section=import&success=import-complete&count=${importedCountForRedirect}&outside=${outsideCountForRedirect}`);
+}
+
+
+export async function requestPasswordReset(formData: FormData) {
+  const supabase = await createClient();
+  const email = text(formData, 'email');
+  if (!email) redirect('/admin/login?error=reset-email');
+
+  const headerStore = await headers();
+  const origin = headerStore.get('origin') ?? headerStore.get('x-forwarded-host')
+    ? `${headerStore.get('x-forwarded-proto') ?? 'https'}://${headerStore.get('x-forwarded-host')}`
+    : '';
+  const redirectTo = origin ? `${origin}/auth/callback?next=/admin/reset-password` : undefined;
+  const { error } = await supabase.auth.resetPasswordForEmail(email, redirectTo ? { redirectTo } : undefined);
+  if (error) redirect('/admin/login?error=reset-failed');
+  redirect('/admin/login?success=reset-sent');
+}
+
+export async function updatePassword(formData: FormData) {
+  const supabase = await createClient();
+  const password = text(formData, 'password');
+  const confirmPassword = text(formData, 'confirm_password');
+  if (password.length < 8 || password !== confirmPassword) {
+    redirect('/admin/reset-password?error=password');
+  }
+  const { error } = await supabase.auth.updateUser({ password });
+  if (error) redirect('/admin/reset-password?error=update');
+  redirect('/admin?success=password-updated');
+}
+
+export async function setAdminRole(formData: FormData) {
+  const supabase = await requireAdmin();
+  const profileId = text(formData, 'profile_id');
+  const makeAdmin = text(formData, 'make_admin') === 'true';
+  if (!profileId) redirect('/admin?section=admins&error=missing-profile');
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!makeAdmin && user?.id === profileId) {
+    redirect('/admin?section=admins&error=cannot-remove-yourself');
+  }
+
+  const { error } = await supabase.from('profiles').update({ is_admin: makeAdmin }).eq('id', profileId);
+  if (error) redirect(`/admin?section=admins&error=${encodeURIComponent(error.message)}`);
+  revalidatePath('/admin');
+  redirect(`/admin?section=admins&success=${makeAdmin ? 'admin-added' : 'admin-removed'}`);
 }
