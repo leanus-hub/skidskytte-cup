@@ -45,29 +45,39 @@ export default async function RaceReviewPage({ params }: { params: Promise<{ id:
   ]);
   if (!race) notFound();
   const reviewRows = (rows ?? []) as ReviewRow[];
-  const warnings = reviewRows.filter(row => row.review_warning);
+  const infoRows = reviewRows.filter(row => row.review_warning && row.review_warning !== 'Status UNKNOWN');
+  const actionRows = reviewRows.filter(row => row.review_warning === 'Status UNKNOWN');
+  const classCount = new Set(reviewRows.map(row => row.class_name)).size;
+  const readyForPublication = race.import_status === 'imported' && actionRows.length === 0;
 
   return <>
     <section className="hero compact-hero">
       <p className="eyebrow">Resultatgranskning</p>
       <h1>{race.name}</h1>
       <p>{race.race_date ?? 'Datum saknas'} · {race.status === 'published' ? 'Publicerad' : 'Utkast'} · {reviewRows.length} resultat</p>
+      <p><strong>{reviewRows.length} resultat · {classCount} klasser · {infoRows.length} informationsnoteringar · {actionRows.length} kräver åtgärd</strong></p>
+      <p>{readyForPublication ? '✓ Klar för publicering' : actionRows.length > 0 ? '⚠ Kontrollera markerade resultat före publicering' : 'Importera resultat innan publicering'}</p>
       <Link className="source-button" href="/admin">← Tillbaka till admin</Link>
     </section>
 
     {error && <p className="alert error">Granskningsvyn saknas. Kör migration 005 i Supabase.</p>}
-    {warnings.length > 0 && <p className="alert error">{warnings.length} rader behöver kontrolleras. De är markerade i tabellen.</p>}
+    {actionRows.length > 0 && <p className="alert error">{actionRows.length} resultat har status UNKNOWN och behöver kontrolleras före publicering.</p>}
+    {infoRows.length > 0 && <p className="alert">{infoRows.length} informationsnoteringar finns i resultatet. DNS, DNF och resultat utanför cupens region är inte blockerande.</p>}
 
     <section className="card section-gap">
       <h2>Importerade resultat och poäng</h2>
       <p className="muted">Originalplacering är placeringen från BiathlonTiming. Cupplacering räknas inom cupens omfattning: hela Sverige för nationella cuper eller vald region för regionala cuper.</p>
       <div className="table-scroll"><table>
         <thead><tr><th>Klass</th><th>Startnr</th><th>Åkare</th><th>Klubb</th><th>Status</th><th>Original</th><th>Cupplac.</th><th>Poäng</th><th>Skytte</th><th>Tid</th><th>Kontroll</th></tr></thead>
-        <tbody>{reviewRows.map(row => <tr key={row.result_id} className={row.review_warning ? 'review-warning' : ''}>
+        <tbody>{reviewRows.map(row => {
+          const needsAction = row.review_warning === 'Status UNKNOWN';
+          const isInfo = Boolean(row.review_warning) && !needsAction;
+          return <tr key={row.result_id} className={needsAction ? 'review-warning' : ''}>
           <td>{row.class_name}</td><td>{row.bib ?? '–'}</td><td><strong>{row.athlete_name}</strong></td><td>{row.club_name}{row.region_name ? <span className="muted"> · {row.region_name}</span> : null}</td>
           <td>{row.result_status}</td><td>{row.source_place ?? '–'}</td><td>{row.region_place ?? '–'}</td><td><strong>{row.cup_points ?? 0}</strong></td>
-          <td>{row.shooting_shots ? `${row.shooting_hits}/${row.shooting_shots}` : '–'}</td><td>{timeLabel(row.total_time_ms)}</td><td>{row.review_warning ?? 'OK'}</td>
-        </tr>)}</tbody>
+          <td>{row.shooting_shots ? `${row.shooting_hits}/${row.shooting_shots}` : '–'}</td><td>{timeLabel(row.total_time_ms)}</td><td>{needsAction ? `⚠ ${row.review_warning}` : isInfo ? `Info · ${row.review_warning}` : '✓ OK'}</td>
+        </tr>;
+        })}</tbody>
       </table></div>
     </section>
   </>;
