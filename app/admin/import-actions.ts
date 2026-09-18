@@ -60,7 +60,7 @@ export async function importRaceResultsSafe(formData: FormData) {
   if (!databaseRaceId) redirect('/admin?section=import&error=missing-race-id');
 
   const { data: race, error: raceError } = await supabase.from('races')
-    .select('id,external_race_id,source_url').eq('id', databaseRaceId).single();
+    .select('id,cup_id,external_race_id,source_url').eq('id', databaseRaceId).single();
   if (raceError || !race) redirect('/admin?section=import&error=race-not-found');
 
   const { error: processingError } = await supabase.from('races')
@@ -72,6 +72,9 @@ export async function importRaceResultsSafe(formData: FormData) {
   try {
     const { importBiathlonTiming } = await import('@/lib/biathlontiming');
     const imported = await importBiathlonTiming(race.external_race_id, race.source_url);
+
+    const { data: cup, error: cupError } = await supabase.from('cups').select('region_id').eq('id', race.cup_id).single();
+    if (cupError || !cup?.region_id) throw cupError ?? new Error('Cupen saknar region och kan inte importeras säkert.');
 
     const [{ data: clubs, error: clubsError }, { data: classes, error: classesError }, { data: athletes, error: athletesError }, { data: oldResults, error: oldResultsError }] = await Promise.all([
       supabase.from('clubs').select('id,name,short_name,aliases,region_id'),
@@ -103,7 +106,7 @@ export async function importRaceResultsSafe(formData: FormData) {
       const club = clubMap.get(normalizeClubName(row.clubName));
       if (club === null) throw new Error(`Tvetydig klubb: ${row.clubName}. Lös klubbnamnet i admin innan import.`);
       if (!club) throw new Error(`Okänd klubb: ${row.clubName}. Lägg till namnet som alias på rätt klubb och importera igen.`);
-      if (!club.region_id) outsideCount += 1;
+      if (club.region_id !== cup.region_id) outsideCount += 1;
 
       const athleteKey = `${normalizeName(row.athleteName)}|${club.id}`;
       const athlete = athleteMap.get(athleteKey);
