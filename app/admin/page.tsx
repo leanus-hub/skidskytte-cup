@@ -81,7 +81,13 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     </nav>
 
     {params.success && <p className="alert success">Ändringen är sparad.</p>}
-    {params.error && <p className="alert error">Något gick fel: {params.error}</p>}
+    {params.error && <div className="alert error">
+      <strong>Något behöver åtgärdas:</strong> {params.error}
+      {section === 'import' && params.error.startsWith('Okänd klubb:') && <p><Link href={adminHref('clubs')}>Öppna Regioner & föreningar och lägg till klubbnamnet som alias →</Link></p>}
+      {section === 'import' && params.error.startsWith('Tvetydig klubb:') && <p><Link href={adminHref('clubs')}>Öppna Regioner & föreningar och kontrollera klubbnamnen →</Link></p>}
+      {section === 'import' && params.error.startsWith('Okänd klass:') && <p><Link href={adminHref('classes')}>Öppna Klassalias och koppla namnet till rätt klass →</Link></p>}
+      {section === 'import' && params.error.startsWith('Tvetydig klass:') && <p><Link href={adminHref('classes')}>Öppna Klassalias och kontrollera klassnamnen →</Link></p>}
+    </div>}
 
     {section === 'home' && <div className="admin-dashboard">
       <Link href={adminHref('season')} className="admin-action-card"><span>01</span><h2>Skapa säsong</h2><p>Lägg upp vinter- eller sommarsäsong innan du skapar cupen.</p></Link>
