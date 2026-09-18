@@ -262,3 +262,19 @@ tr.outside-region td { color:var(--muted); background:#f7f8fa; }
 .plan-remove { width:32px; min-height:32px; padding:0; border-radius:50%; background:transparent; color:var(--muted); font-size:1.3rem; }
 .plan-footer { margin:16px 0 0; }
 @media(max-width:850px){.plan-head{display:none}.plan-grid.plan-row{grid-template-columns:30px 1fr 34px}.plan-row input,.plan-row select{grid-column:2}.plan-row strong{grid-row:1}.plan-remove{grid-column:3;grid-row:1}.plan-row input:first-of-type{grid-row:1}.plan-footer{align-items:stretch;flex-direction:column}.plan-cup-selector{grid-template-columns:1fr}.plan-cup-selector label{grid-column:auto}}
+
+.season-plan-item.editable { grid-template-columns:38px minmax(0,1fr) auto; }
+.plan-item-main { display:flex; align-items:center; justify-content:space-between; gap:12px; min-width:0; }
+.plan-item-actions { display:flex; gap:4px; }
+.plan-item-actions form { margin:0; }
+.icon-button { width:31px; min-height:31px; padding:0; border-radius:8px; background:var(--accent-soft); color:var(--accent-dark); }
+.icon-button:disabled { opacity:.3; }
+.plan-edit { grid-column:2/-1; margin-top:3px; }
+.plan-edit > summary { cursor:pointer; color:var(--accent); font-weight:800; font-size:.8rem; }
+.plan-edit-form { display:grid; grid-template-columns:minmax(180px,1.4fr) 145px minmax(120px,.8fr) minmax(170px,1fr); gap:10px; padding:13px; margin-top:8px; background:#f7f8fa; border-radius:10px; }
+.plan-edit-form label { margin:0; font-size:.76rem; }
+.plan-edit-form input,.plan-edit-form select { margin:4px 0 0; }
+.plan-edit-form .plan-source { grid-column:1/4; }
+.plan-edit-form .check-row { align-self:end; padding-bottom:10px; }
+.plan-edit-form button[type=submit] { grid-column:1/-1; justify-self:end; }
+@media(max-width:800px){.season-plan-item.editable{grid-template-columns:34px 1fr}.season-plan-item.editable>.badge{grid-column:2;justify-self:start}.plan-item-main{align-items:flex-start}.plan-edit{grid-column:1/-1}.plan-edit-form{grid-template-columns:1fr}.plan-edit-form .plan-source,.plan-edit-form button[type=submit]{grid-column:auto}.plan-edit-form .check-row{padding-bottom:0}}
