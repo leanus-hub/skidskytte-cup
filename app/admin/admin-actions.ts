@@ -458,3 +458,41 @@ export async function setAdminRole(formData: FormData) {
   revalidatePath('/admin');
   redirect(`/admin?section=admins&success=${makeAdmin ? 'admin-added' : 'admin-removed'}`);
 }
+
+
+export async function inviteAdmin(formData: FormData) {
+  const supabase = await requireAdmin();
+  const email = text(formData, 'email').toLowerCase();
+  if (!email) redirect('/admin?section=admins&error=missing-email');
+
+  const headerStore = await headers();
+  const requestOrigin = headerStore.get('origin');
+  const forwardedHost = headerStore.get('x-forwarded-host');
+  const origin = requestOrigin ?? (forwardedHost
+    ? `${headerStore.get('x-forwarded-proto') ?? 'https'}://${forwardedHost}`
+    : '');
+  const emailRedirectTo = origin ? `${origin}/auth/callback?next=/admin` : undefined;
+
+  const { error: inviteError } = await supabase.auth.signInWithOtp({
+    email,
+    options: {
+      shouldCreateUser: true,
+      ...(emailRedirectTo ? { emailRedirectTo } : {}),
+    },
+  });
+  if (inviteError) redirect(`/admin?section=admins&error=${encodeURIComponent(inviteError.message)}`);
+
+  const { data: invitedProfile, error: profileError } = await supabase
+    .from('profiles')
+    .select('id')
+    .ilike('display_name', email)
+    .maybeSingle();
+  if (profileError) redirect(`/admin?section=admins&error=${encodeURIComponent(profileError.message)}`);
+  if (!invitedProfile) redirect('/admin?section=admins&error=invite-profile-not-created');
+
+  const { error: roleError } = await supabase.from('profiles').update({ is_admin: true }).eq('id', invitedProfile.id);
+  if (roleError) redirect(`/admin?section=admins&error=${encodeURIComponent(roleError.message)}`);
+
+  revalidatePath('/admin');
+  redirect('/admin?section=admins&success=admin-invited');
+}
