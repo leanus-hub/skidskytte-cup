@@ -419,9 +419,11 @@ export async function requestPasswordReset(formData: FormData) {
   if (!email) redirect('/admin/login?error=reset-email');
 
   const headerStore = await headers();
-  const origin = headerStore.get('origin') ?? headerStore.get('x-forwarded-host')
-    ? `${headerStore.get('x-forwarded-proto') ?? 'https'}://${headerStore.get('x-forwarded-host')}`
-    : '';
+  const requestOrigin = headerStore.get('origin');
+  const forwardedHost = headerStore.get('x-forwarded-host');
+  const origin = requestOrigin ?? (forwardedHost
+    ? `${headerStore.get('x-forwarded-proto') ?? 'https'}://${forwardedHost}`
+    : '');
   const redirectTo = origin ? `${origin}/auth/callback?next=/admin/reset-password` : undefined;
   const { error } = await supabase.auth.resetPasswordForEmail(email, redirectTo ? { redirectTo } : undefined);
   if (error) redirect('/admin/login?error=reset-failed');
