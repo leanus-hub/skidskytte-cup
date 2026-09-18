@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { addClassAlias, createCup, createRace, createSeason, inviteAdmin, logout, setAdminRole, setRaceStatus } from './admin-actions';
 import { importRaceResultsSafe } from './import-actions';
 import ClubManager from './club-manager';
+import CupPlanBuilder from './cup-plan-builder';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,7 +17,7 @@ function adminHref(section: string, params: Record<string,string|undefined> = {}
 
 export default async function AdminPage({ searchParams }: { searchParams: Promise<Params> }) {
   const params = await searchParams;
-  const section = ['season','cup','race','import','classes','clubs','admins'].includes(params.section ?? '') ? params.section! : 'home';
+  const section = ['season','cup','plan','race','import','classes','clubs','admins'].includes(params.section ?? '') ? params.section! : 'home';
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect('/admin/login');
@@ -26,7 +27,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   const [{ data: seasons }, { data: cups }, { data: races }, { data: classes }, { data: regions }] = await Promise.all([
     supabase.from('seasons').select('id,name,is_active,starts_on,ends_on').order('starts_on', { ascending: false }),
     supabase.from('cups').select('id,name,cup_type,region_id,season_id').order('created_at', { ascending: false }),
-    supabase.from('races').select('id,name,race_date,status,cup_id,source_url,import_status,import_error,imported_result_count,imported_at,import_warnings').order('race_date', { ascending: false }),
+    supabase.from('races').select('id,name,race_date,status,cup_id,source_url,location,organizer_club_id,sort_order,import_status,import_error,imported_result_count,imported_at,import_warnings').order('race_date', { ascending: false }),
     supabase.from('classes').select('id,name,aliases').eq('is_official', true).order('sort_order').order('name'),
     supabase.from('regions').select('id,name').order('sort_order'),
   ]);
@@ -39,7 +40,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     adminProfiles = data ?? [];
   }
   let clubs: {id:string;name:string;short_name:string|null;aliases:string[]|null;region_id:string|null}[] = [];
-  if (section === 'clubs') {
+  if (section === 'clubs' || section === 'plan') {
     const { data, error } = await supabase.from('clubs').select('id,name,short_name,aliases,region_id').order('name');
     if (error) throw new Error(`Kunde inte läsa föreningar: ${error.message}`);
     clubs = data ?? [];
@@ -67,7 +68,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   const cupNameById = new Map((cups ?? []).map(cup => [cup.id, cup.name]));
 
   const nav = [
-    ['home','Översikt'], ['season','Ny säsong'], ['cup','Ny cup'], ['race','Koppla tävling'],
+    ['home','Översikt'], ['season','Ny säsong'], ['cup','Ny cup'], ['plan','Tävlingsplan'], ['race','Koppla resultat'],
     ['import','Import & publicering'], ['classes','Klassalias'], ['clubs','Regioner & föreningar'], ['admins','Administratörer'],
   ];
 
@@ -92,10 +93,11 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     {section === 'home' && <div className="admin-dashboard">
       <Link href={adminHref('season')} className="admin-action-card"><span>01</span><h2>Skapa säsong</h2><p>Lägg upp vinter- eller sommarsäsong innan du skapar cupen.</p></Link>
       <Link href={adminHref('cup')} className="admin-action-card"><span>02</span><h2>Skapa cup</h2><p>Välj säsong, typ och region för en ny regional cup.</p></Link>
-      <Link href={adminHref('race')} className="admin-action-card"><span>03</span><h2>Koppla tävling</h2><p>Lägg till en BiathlonTiming-tävling i rätt cup.</p></Link>
-      <Link href={adminHref('import')} className="admin-action-card"><span>04</span><h2>Importera resultat</h2><p>Hämta resultat, granska och publicera deltävlingen.</p></Link>
-      <Link href={adminHref('classes')} className="admin-action-card"><span>05</span><h2>Klassalias</h2><p>Koppla alternativa klassnamn till dina befintliga klasser.</p></Link>
-      <Link href={adminHref('clubs')} className="admin-action-card"><span>06</span><h2>Regioner & föreningar</h2><p>Filtrera per region och redigera en förening i taget.</p></Link>
+      <Link href={adminHref('plan')} className="admin-action-card"><span>03</span><h2>Planera deltävlingar</h2><p>Lägg upp hela cupens tänkta tävlingskalender samlat.</p></Link>
+      <Link href={adminHref('race')} className="admin-action-card"><span>04</span><h2>Koppla resultat</h2><p>Koppla BiathlonTiming när en planerad tävling är genomförd.</p></Link>
+      <Link href={adminHref('import')} className="admin-action-card"><span>05</span><h2>Importera resultat</h2><p>Hämta resultat, granska och publicera deltävlingen.</p></Link>
+      <Link href={adminHref('classes')} className="admin-action-card"><span>06</span><h2>Klassalias</h2><p>Koppla alternativa klassnamn till dina befintliga klasser.</p></Link>
+      <Link href={adminHref('clubs')} className="admin-action-card"><span>07</span><h2>Regioner & föreningar</h2><p>Filtrera per region och redigera en förening i taget.</p></Link>
     </div>}
 
     {section === 'season' && <section className="card admin-workspace"><h2>Skapa ny säsong</h2><form action={createSeason}>
@@ -109,6 +111,23 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       <label htmlFor="cup_name">Cupnamn</label><input id="cup_name" name="name" required placeholder="Syd Cup Vinter 2027" />
       <div className="form-columns"><div><label htmlFor="cup_type">Typ</label><select id="cup_type" name="cup_type" defaultValue="vinter"><option value="vinter">Vintercup</option><option value="sommar">Sommarcup</option></select></div><div><label htmlFor="region_id">Region</label><select id="region_id" name="region_id" required defaultValue=""><option value="" disabled>Välj region</option>{(regions??[]).map(r=><option key={r.id} value={r.id}>{r.name}</option>)}</select></div></div>
       <button type="submit">Skapa cup</button></form><h3>Befintliga cuper</h3><div className="table-scroll"><table><thead><tr><th>Cup</th><th>Säsong</th><th>Region</th></tr></thead><tbody>{(cups??[]).map(c=><tr key={c.id}><td><strong>{c.name}</strong></td><td>{seasonNameById.get(c.season_id) ?? 'Säsong saknas'}</td><td>{c.region_id ? (regionNameById.get(c.region_id) ?? `Okänd region (${c.region_id})`) : 'Region saknas'}</td></tr>)}</tbody></table></div></section>}
+
+    {section === 'plan' && <section className="card admin-workspace">
+      <h2>Tävlingsplan</h2>
+      <p className="muted">Bygg cupens säsongsplan innan resultatkällor finns. Planerade tävlingar sparas som utkast och påverkar inte cupställningen.</p>
+      <form method="get" className="plan-cup-selector"><input type="hidden" name="section" value="plan"/><label htmlFor="plan_cup">Cup</label><select id="plan_cup" name="cup" defaultValue={params.cup ?? ''} required><option value="" disabled>Välj cup</option>{(cups??[]).map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select><button type="submit" className="secondary-dark">Öppna</button></form>
+      {params.cup && <>
+        <div className="season-plan-existing">
+          <h3>Nuvarande tävlingsplan</h3>
+          {(races??[]).filter(r=>r.cup_id===params.cup).sort((a,b)=>(a.sort_order??0)-(b.sort_order??0)).length===0 && <p className="muted">Inga deltävlingar upplagda ännu.</p>}
+          {(races??[]).filter(r=>r.cup_id===params.cup).sort((a,b)=>(a.sort_order??0)-(b.sort_order??0)).map((r,index)=><article className="season-plan-item" key={r.id}>
+            <span className="plan-number">{index+1}</span><div><strong>{r.name}</strong><p>{r.race_date??'Datum ej satt'}{r.location?` · ${r.location}`:''}</p></div>
+            <span className={`badge ${r.status==='published'?'success-badge':''}`}>{r.status==='published'?'Publicerad':r.import_status==='imported'?'Importerad':r.source_url?'Redo för import':'Planerad'}</span>
+          </article>)}
+        </div>
+        <CupPlanBuilder cupId={params.cup} clubs={clubs.map(c=>({id:c.id,name:c.name}))}/>
+      </>}
+    </section>}
 
     {section === 'race' && <section className="card admin-workspace"><h2>Koppla tävling till cup</h2><form action={createRace}>
       <label htmlFor="cup_id">Cup</label><select id="cup_id" name="cup_id" required defaultValue=""><option value="" disabled>Välj cup</option>{(cups??[]).map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select>
