@@ -159,7 +159,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
             {r.status==='draft' && r.import_status==='not_imported' && !r.source_url && !r.external_race_id && <form action={deletePlannedRace} className="delete-planned-race-form"><input type="hidden" name="race_id" value={r.id}/><input type="hidden" name="cup_id" value={params.cup}/><button type="submit" className="danger-link">Ta bort planerad tävling</button></form>}
           </article>)}
         </div>
-        <CupPlanBuilder cupId={params.cup} clubs={clubs.map(c=>({id:c.id,name:c.name}))}/>
+        <CupPlanBuilder cupId={params.cup} existingCount={(races??[]).filter(r=>r.cup_id===params.cup).length} clubs={clubs.map(c=>({id:c.id,name:c.name}))}/>
       </>}
     </section>}
 
