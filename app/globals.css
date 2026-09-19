@@ -321,3 +321,28 @@ tr.outside-region td { color:var(--muted); background:#f7f8fa; }
  .next-race-card{align-items:flex-start}
  .next-race-date{min-width:65px;min-height:58px;font-size:1rem}
 }
+
+.admin-cup-overview { margin-bottom:28px; }
+.admin-overview-heading { display:flex; justify-content:space-between; align-items:end; gap:16px; margin:0 2px 12px; }
+.admin-overview-heading h2 { margin:3px 0 0; }
+.admin-cup-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(330px,1fr)); gap:14px; }
+.admin-cup-card { overflow:hidden; }
+.admin-cup-title { display:flex; justify-content:space-between; gap:12px; align-items:flex-start; }
+.admin-cup-title small { color:var(--muted); }
+.admin-cup-title h3 { margin:4px 0 0; font-size:1.3rem; }
+.admin-attention { background:#fee8e7; color:#8b2722; }
+.admin-cup-metrics { display:grid; grid-template-columns:repeat(5,1fr); gap:7px; margin:17px 0; }
+.admin-cup-metrics span { display:grid; gap:3px; padding:9px 6px; border-radius:9px; background:#f4f7f5; color:var(--muted); font-size:.68rem; text-align:center; }
+.admin-cup-metrics strong { color:var(--accent-dark); font-size:1.15rem; }
+.admin-next-race { display:grid; grid-template-columns:auto 1fr; gap:2px 10px; align-items:center; padding:11px 12px; border-left:4px solid var(--accent); border-radius:8px; background:#f3faf7; }
+.admin-next-race span { grid-row:1/3; color:var(--accent); font-size:.7rem; font-weight:900; text-transform:uppercase; }
+.admin-next-race small { color:var(--muted); }
+.admin-next-race-empty { min-height:48px; margin:0; }
+.admin-cup-links { display:flex; gap:12px; flex-wrap:wrap; margin-top:15px; }
+.admin-cup-links a { color:var(--accent); font-size:.82rem; font-weight:800; }
+.admin-tools-heading { margin:30px 2px 12px; }
+@media(max-width:650px){
+ .admin-cup-grid{grid-template-columns:1fr}
+ .admin-cup-metrics{grid-template-columns:repeat(3,1fr)}
+ .admin-overview-heading{align-items:center}
+}
