@@ -150,7 +150,18 @@ export async function updatePlannedRace(formData: FormData) {
   const sourceUrl = text(formData, 'source_url');
   const cancelled = text(formData, 'cancelled') === 'true';
   if (!raceId || !cupId || !name) redirect('/admin?section=plan&error=race-fields');
-  await requireOpenCup(supabase, cupId, `/admin?section=plan&cup=${encodeURIComponent(cupId)}`);
+  const { data: cup } = await supabase.from('cups').select('lifecycle_status').eq('id', cupId).single();
+  const completed = cup?.lifecycle_status === 'completed';
+  const { data: existingRace } = await supabase.from('races').select('race_date,location,organizer_club_id,source_url,status').eq('id', raceId).eq('cup_id', cupId).single();
+  if (!existingRace) redirect('/admin?section=plan&error=race-not-found');
+  if (completed) {
+    const metadataOnly = raceDate === (existingRace.race_date ?? null)
+      && location === (existingRace.location ?? null)
+      && organizerClubId === (existingRace.organizer_club_id ?? null)
+      && sourceUrl === (existingRace.source_url ?? '')
+      && cancelled === (existingRace.status === 'cancelled');
+    if (!metadataOnly) redirect(`/admin?section=plan&cup=${encodeURIComponent(cupId)}&error=completed-metadata-only`);
+  }
 
   let externalRaceId: string | null = null;
   let normalizedSourceUrl: string | null = null;
