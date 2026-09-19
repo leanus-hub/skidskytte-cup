@@ -24,6 +24,18 @@ async function requireAdmin() {
   return supabase;
 }
 
+async function requireOpenCup(supabase: Awaited<ReturnType<typeof requireAdmin>>, cupId: string, returnTo: string) {
+  const { data: cup, error } = await supabase.from('cups').select('lifecycle_status').eq('id', cupId).single();
+  if (error || !cup) redirect(`${returnTo}&error=cup-not-found`);
+  if (cup.lifecycle_status === 'completed') redirect(`${returnTo}&error=cup-completed`);
+}
+
+async function requireOpenRaceCup(supabase: Awaited<ReturnType<typeof requireAdmin>>, raceId: string, returnTo: string) {
+  const { data: race, error } = await supabase.from('races').select('cup_id').eq('id', raceId).single();
+  if (error || !race) redirect(`${returnTo}&error=race-not-found`);
+  await requireOpenCup(supabase, race.cup_id, returnTo);
+}
+
 export async function login(formData: FormData) {
   const supabase = await createClient();
   const email = text(formData, 'email');
@@ -98,6 +110,7 @@ export async function createPlannedRaces(formData: FormData) {
   const cupId = text(formData, 'cup_id');
   const raw = text(formData, 'races_json');
   if (!cupId || !raw) redirect('/admin?section=plan&error=plan-fields');
+  await requireOpenCup(supabase, cupId, `/admin?section=plan&cup=${encodeURIComponent(cupId)}`);
 
   let rows: { name:string; race_date?:string; location?:string; organizer_club_id?:string }[] = [];
   try { rows = JSON.parse(raw); } catch { redirect('/admin?section=plan&error=invalid-plan'); }
@@ -135,6 +148,7 @@ export async function updatePlannedRace(formData: FormData) {
   const sourceUrl = text(formData, 'source_url');
   const cancelled = text(formData, 'cancelled') === 'true';
   if (!raceId || !cupId || !name) redirect('/admin?section=plan&error=race-fields');
+  await requireOpenCup(supabase, cupId, `/admin?section=plan&cup=${encodeURIComponent(cupId)}`);
 
   let externalRaceId: string | null = null;
   let normalizedSourceUrl: string | null = null;
@@ -162,6 +176,7 @@ export async function movePlannedRace(formData: FormData) {
   const supabase = await requireAdmin();
   const raceId = text(formData, 'race_id'), cupId = text(formData, 'cup_id'), direction = text(formData, 'direction');
   if (!raceId || !cupId || !['up','down'].includes(direction)) redirect('/admin?section=plan&error=move-fields');
+  await requireOpenCup(supabase, cupId, `/admin?section=plan&cup=${encodeURIComponent(cupId)}`);
   const { data } = await supabase.from('races').select('id,sort_order').eq('cup_id',cupId).order('sort_order');
   const rows = data ?? [], index = rows.findIndex(r=>r.id===raceId), target = direction==='up'?index-1:index+1;
   if (index>=0 && target>=0 && target<rows.length) {
@@ -180,6 +195,7 @@ export async function deletePlannedRace(formData: FormData) {
   const raceId = text(formData, 'race_id');
   const cupId = text(formData, 'cup_id');
   if (!raceId || !cupId) redirect('/admin?section=plan&error=delete-fields');
+  await requireOpenCup(supabase, cupId, `/admin?section=plan&cup=${encodeURIComponent(cupId)}`);
 
   const { data: race, error: raceError } = await supabase
     .from('races')
@@ -254,6 +270,7 @@ export async function setRaceStatus(formData: FormData) {
   if (!raceId || !['draft', 'published'].includes(status)) {
     redirect('/admin?error=invalid-race-status');
   }
+  await requireOpenRaceCup(supabase, raceId, '/admin?section=import');
 
   const { error } = await supabase.from('races').update({ status }).eq('id', raceId);
   if (error) redirect(`/admin?error=${encodeURIComponent(error.message)}`);
