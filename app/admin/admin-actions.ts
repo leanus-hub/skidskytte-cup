@@ -85,8 +85,9 @@ export async function updateCupSettings(formData: FormData) {
   const cupId=text(formData,'cup_id'), name=text(formData,'name'), rulesetId=text(formData,'ruleset_id');
   const minRaces=Number(text(formData,'min_races_for_prize')||'3');
   const active=text(formData,'active')==='true';
-  if(!cupId||!name||!rulesetId||!Number.isInteger(minRaces)||minRaces<0) redirect('/admin?section=cup&error=cup-settings');
-  const {error}=await supabase.from('cups').update({name,ruleset_id:rulesetId,min_races_for_prize:minRaces,active}).eq('id',cupId);
+  const lifecycleStatus=text(formData,'lifecycle_status')||'ongoing';
+  if(!cupId||!name||!rulesetId||!Number.isInteger(minRaces)||minRaces<0||!['planned','ongoing','completed'].includes(lifecycleStatus)) redirect('/admin?section=cup&error=cup-settings');
+  const {error}=await supabase.from('cups').update({name,ruleset_id:rulesetId,min_races_for_prize:minRaces,active,lifecycle_status:lifecycleStatus}).eq('id',cupId);
   if(error) redirect(`/admin?section=cup&edit=${encodeURIComponent(cupId)}&error=${encodeURIComponent(error.message)}`);
   revalidatePath('/admin'); revalidatePath('/');
   redirect(`/admin?section=cup&edit=${encodeURIComponent(cupId)}&success=cup-updated`);
