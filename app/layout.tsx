@@ -1,5 +1,6 @@
 import './globals.css';
 import Link from 'next/link';
+import { Analytics } from '@vercel/analytics/next';
 
 export const metadata = {
   title: 'Regioncup Skidskytte',
@@ -22,7 +23,8 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           </div>
         </header>
         <main className="wrap">{children}</main>
-        <footer><div className="wrap">Regional cupadministration för skidskytte</div></footer>
+        <footer><div className="wrap">Regional cupadministration för skidskytte · <Link href="/kontakt">Upptäckt ett fel eller har ett förbättringsförslag?</Link></div></footer>
+        <Analytics />
       </body>
     </html>
   );
