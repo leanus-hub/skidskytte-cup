@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
-import { addClassAlias, createCup, createRace, createSeason, inviteAdmin, logout, setAdminRole, setRaceStatus, updatePlannedRace, movePlannedRace, updateCupSettings } from './admin-actions';
+import { addClassAlias, createCup, createSeason, deletePlannedRace, inviteAdmin, logout, setAdminRole, setRaceStatus, updatePlannedRace, movePlannedRace, updateCupSettings } from './admin-actions';
 import { importRaceResultsSafe } from './import-actions';
 import ClubManager from './club-manager';
 import CupPlanBuilder from './cup-plan-builder';
