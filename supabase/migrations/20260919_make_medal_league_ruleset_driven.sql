@@ -1,0 +1,4 @@
+-- Medal league follows the selected ruleset.
+-- Recreates cup_club_standings with security_invoker=true.
+-- Medal counts require both cup_rulesets.medal_league_enabled and
+-- cup_ruleset_class_rules.medal_eligible. Point standings remain unchanged.
