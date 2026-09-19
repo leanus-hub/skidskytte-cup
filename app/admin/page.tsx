@@ -68,6 +68,19 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   const clubNameById = new Map(clubs.map(club => [club.id, club.name]));
   const cupNameById = new Map((cups ?? []).map(cup => [cup.id, cup.name]));
 
+  const today = new Date().toISOString().slice(0,10);
+  const cupDashboard = (cups ?? []).map(cup => {
+    const cupRaces = (races ?? []).filter(r => r.cup_id === cup.id);
+    const published = cupRaces.filter(r => r.status === 'published').length;
+    const cancelled = cupRaces.filter(r => r.status === 'cancelled').length;
+    const imported = cupRaces.filter(r => r.status !== 'published' && r.import_status === 'imported').length;
+    const ready = cupRaces.filter(r => r.status !== 'published' && r.import_status !== 'imported' && !!r.source_url).length;
+    const planned = cupRaces.filter(r => r.status !== 'published' && r.status !== 'cancelled' && r.import_status !== 'imported' && !r.source_url).length;
+    const failed = cupRaces.filter(r => r.import_status === 'failed').length;
+    const nextRace = [...cupRaces].filter(r => r.status !== 'published' && r.status !== 'cancelled' && r.race_date && r.race_date >= today).sort((a,b)=>String(a.race_date).localeCompare(String(b.race_date)) || (a.sort_order??0)-(b.sort_order??0))[0];
+    return { cup, races: cupRaces.length, published, cancelled, imported, ready, planned, failed, nextRace };
+  });
+
   const nav = [
     ['home','Översikt'], ['season','Ny säsong'], ['cup','Ny cup'], ['plan','Tävlingsplan'], ['race','Koppla resultat'],
     ['import','Import & publicering'], ['classes','Klassalias'], ['clubs','Regioner & föreningar'], ['admins','Administratörer'],
@@ -91,15 +104,26 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       {section === 'import' && params.error.startsWith('Tvetydig klass:') && <p><Link href={adminHref('classes')}>Öppna Klassalias och kontrollera klassnamnen →</Link></p>}
     </div>}
 
-    {section === 'home' && <div className="admin-dashboard">
-      <Link href={adminHref('season')} className="admin-action-card"><span>01</span><h2>Skapa säsong</h2><p>Lägg upp vinter- eller sommarsäsong innan du skapar cupen.</p></Link>
-      <Link href={adminHref('cup')} className="admin-action-card"><span>02</span><h2>Skapa cup</h2><p>Välj säsong, typ och region för en ny regional cup.</p></Link>
-      <Link href={adminHref('plan')} className="admin-action-card"><span>03</span><h2>Planera deltävlingar</h2><p>Lägg upp hela cupens tänkta tävlingskalender samlat.</p></Link>
-      <Link href={adminHref('race')} className="admin-action-card"><span>04</span><h2>Koppla resultat</h2><p>Koppla BiathlonTiming när en planerad tävling är genomförd.</p></Link>
-      <Link href={adminHref('import')} className="admin-action-card"><span>05</span><h2>Importera resultat</h2><p>Hämta resultat, granska och publicera deltävlingen.</p></Link>
-      <Link href={adminHref('classes')} className="admin-action-card"><span>06</span><h2>Klassalias</h2><p>Koppla alternativa klassnamn till dina befintliga klasser.</p></Link>
-      <Link href={adminHref('clubs')} className="admin-action-card"><span>07</span><h2>Regioner & föreningar</h2><p>Filtrera per region och redigera en förening i taget.</p></Link>
-    </div>}
+    {section === 'home' && <>
+      <section className="admin-cup-overview">
+        <div className="admin-overview-heading"><div><p className="eyebrow dark">Aktuellt läge</p><h2>Cuper</h2></div><Link className="source-button" href={adminHref('cup')}>+ Ny cup</Link></div>
+        <div className="admin-cup-grid">{cupDashboard.map(({cup,races:raceCount,published,cancelled,imported,ready,planned,failed,nextRace})=><article className="card admin-cup-card" key={cup.id}>
+          <div className="admin-cup-title"><div><small>{seasonNameById.get(cup.season_id)??'Säsong saknas'} · {cup.region_id?regionNameById.get(cup.region_id)??'Okänd region':'Region saknas'}</small><h3>{cup.name}</h3></div>{failed>0&&<span className="badge admin-attention">{failed} importfel</span>}</div>
+          <div className="admin-cup-metrics"><span><strong>{raceCount}</strong>Deltävlingar</span><span><strong>{published}</strong>Publicerade</span><span><strong>{ready}</strong>Redo för import</span><span><strong>{imported}</strong>Importerade</span><span><strong>{planned}</strong>Planerade</span>{cancelled>0&&<span><strong>{cancelled}</strong>Inställda</span>}</div>
+          {nextRace?<div className="admin-next-race"><span>Nästa</span><strong>{nextRace.name}</strong><small>{nextRace.race_date}{nextRace.location?` · ${nextRace.location}`:''}</small></div>:<p className="muted admin-next-race-empty">{raceCount?'Ingen kommande planerad tävling.':'Ingen tävlingsplan ännu.'}</p>}
+          <div className="admin-cup-links"><Link href={adminHref('plan',{cup:cup.id})}>Tävlingsplan →</Link>{ready+imported+failed>0&&<Link href={adminHref('import',{cup:cup.id})}>Import & publicering →</Link>}<Link href={`/?region=${cup.region_id??''}&cup=${cup.id}&view=overview`}>Publik vy ↗</Link></div>
+        </article>)}</div>
+      </section>
+      <h2 className="admin-tools-heading">Administration</h2>
+      <div className="admin-dashboard">
+        <Link href={adminHref('season')} className="admin-action-card"><span>01</span><h2>Skapa säsong</h2><p>Lägg upp vinter- eller sommarsäsong innan du skapar cupen.</p></Link>
+        <Link href={adminHref('cup')} className="admin-action-card"><span>02</span><h2>Skapa cup</h2><p>Välj säsong, typ och region för en ny regional cup.</p></Link>
+        <Link href={adminHref('plan')} className="admin-action-card"><span>03</span><h2>Planera deltävlingar</h2><p>Lägg upp hela cupens tänkta tävlingskalender samlat.</p></Link>
+        <Link href={adminHref('import')} className="admin-action-card"><span>04</span><h2>Importera & publicera</h2><p>Hämta resultat, granska och publicera deltävlingen.</p></Link>
+        <Link href={adminHref('classes')} className="admin-action-card"><span>05</span><h2>Klassalias</h2><p>Koppla alternativa klassnamn till dina befintliga klasser.</p></Link>
+        <Link href={adminHref('clubs')} className="admin-action-card"><span>06</span><h2>Regioner & föreningar</h2><p>Filtrera per region och redigera en förening i taget.</p></Link>
+      </div>
+    </>}
 
     {section === 'season' && <section className="card admin-workspace"><h2>Skapa ny säsong</h2><form action={createSeason}>
       <label htmlFor="season_name">Namn</label><input id="season_name" name="name" required placeholder="Säsong 2026/2027" />
