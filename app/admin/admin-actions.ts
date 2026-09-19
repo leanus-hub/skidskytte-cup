@@ -691,7 +691,7 @@ export async function updateRulesetClassRule(formData: FormData) {
   const rulesetId = text(formData, 'ruleset_id'), classId = text(formData, 'class_id');
   const scoringMode = text(formData, 'scoring_mode');
   const fixedRaw = text(formData, 'fixed_points');
-  const fixedPoints = scoringMode === 'fixed' ? Number(fixedRaw) : null;
+  const fixedPoints: number | null = scoringMode === 'fixed' ? Number(fixedRaw) : null;
   const medalEligible = text(formData, 'medal_eligible') === 'true';
   if (!rulesetId || !classId || !['standard','fixed','none'].includes(scoringMode) ||
       (scoringMode === 'fixed' && (!Number.isFinite(fixedPoints) || fixedPoints < 0))) {
