@@ -58,8 +58,9 @@ export async function createCup(formData: FormData) {
   const name = text(formData, 'name');
   const cupType = text(formData, 'cup_type');
   const regionId = text(formData, 'region_id');
+  const rulesetId = text(formData, 'ruleset_id');
 
-  if (!seasonId || !name || !['sommar', 'vinter'].includes(cupType) || !regionId) {
+  if (!seasonId || !name || !['sommar', 'vinter'].includes(cupType) || !regionId || !rulesetId) {
     redirect('/admin?section=cup&error=cup-fields');
   }
 
@@ -69,6 +70,7 @@ export async function createCup(formData: FormData) {
     cup_type: cupType,
     competition_scope: 'region',
     region_id: regionId,
+    ruleset_id: rulesetId,
     min_races_for_prize: 3,
     active: true,
   });
@@ -76,6 +78,18 @@ export async function createCup(formData: FormData) {
   if (error) redirect(`/admin?section=cup&error=${encodeURIComponent(error.message)}`);
   revalidatePath('/admin');
   redirect('/admin?section=cup&success=cup-created');
+}
+
+export async function updateCupSettings(formData: FormData) {
+  const supabase = await requireAdmin();
+  const cupId=text(formData,'cup_id'), name=text(formData,'name'), rulesetId=text(formData,'ruleset_id');
+  const minRaces=Number(text(formData,'min_races_for_prize')||'3');
+  const active=text(formData,'active')==='true';
+  if(!cupId||!name||!rulesetId||!Number.isInteger(minRaces)||minRaces<0) redirect('/admin?section=cup&error=cup-settings');
+  const {error}=await supabase.from('cups').update({name,ruleset_id:rulesetId,min_races_for_prize:minRaces,active}).eq('id',cupId);
+  if(error) redirect(`/admin?section=cup&edit=${encodeURIComponent(cupId)}&error=${encodeURIComponent(error.message)}`);
+  revalidatePath('/admin'); revalidatePath('/');
+  redirect(`/admin?section=cup&edit=${encodeURIComponent(cupId)}&success=cup-updated`);
 }
 
 export async function createPlannedRaces(formData: FormData) {
