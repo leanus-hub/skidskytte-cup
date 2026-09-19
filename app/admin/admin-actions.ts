@@ -83,7 +83,7 @@ export async function createCup(formData: FormData) {
     competition_scope: 'region',
     region_id: regionId,
     ruleset_id: rulesetId,
-    min_races_for_prize: 3,
+    min_races_for_prize: (await supabase.from('cup_rulesets').select('min_races_for_prize').eq('id', rulesetId).single()).data?.min_races_for_prize ?? 3,
     active: true,
   });
 
@@ -99,6 +99,8 @@ export async function updateCupSettings(formData: FormData) {
   const active=text(formData,'active')==='true';
   const lifecycleStatus=text(formData,'lifecycle_status')||'ongoing';
   if(!cupId||!name||!rulesetId||!Number.isInteger(minRaces)||minRaces<0||!['planned','ongoing','completed'].includes(lifecycleStatus)) redirect('/admin?section=cup&error=cup-settings');
+  const {data:currentCup}=await supabase.from('cups').select('lifecycle_status,ruleset_id').eq('id',cupId).single();
+  if(currentCup?.lifecycle_status==='completed' && rulesetId!==currentCup.ruleset_id) redirect(`/admin?section=cup&edit=${encodeURIComponent(cupId)}&error=completed-ruleset-locked`);
   const {error}=await supabase.from('cups').update({name,ruleset_id:rulesetId,min_races_for_prize:minRaces,active,lifecycle_status:lifecycleStatus}).eq('id',cupId);
   if(error) redirect(`/admin?section=cup&edit=${encodeURIComponent(cupId)}&error=${encodeURIComponent(error.message)}`);
   revalidatePath('/admin'); revalidatePath('/');
