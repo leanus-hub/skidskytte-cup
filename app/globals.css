@@ -346,3 +346,7 @@ tr.outside-region td { color:var(--muted); background:#f7f8fa; }
  .admin-cup-metrics{grid-template-columns:repeat(3,1fr)}
  .admin-overview-heading{align-items:center}
 }
+
+.delete-planned-race-form { margin-top:8px; }
+.danger-link { border:0; background:transparent; padding:4px 0; color:#9b2c2c; font-size:.78rem; font-weight:800; box-shadow:none; }
+.danger-link:hover { background:transparent; text-decoration:underline; }
