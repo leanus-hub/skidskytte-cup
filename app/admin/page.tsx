@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
-import { addClassAlias, createCup, createRace, createSeason, inviteAdmin, logout, setAdminRole, setRaceStatus, updatePlannedRace, movePlannedRace } from './admin-actions';
+import { addClassAlias, createCup, createRace, createSeason, inviteAdmin, logout, setAdminRole, setRaceStatus, updatePlannedRace, movePlannedRace, updateCupSettings } from './admin-actions';
 import { importRaceResultsSafe } from './import-actions';
 import ClubManager from './club-manager';
 import CupPlanBuilder from './cup-plan-builder';
@@ -24,12 +24,13 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   const { data: profile } = await supabase.from('profiles').select('display_name,is_admin').eq('id', user.id).single();
   if (!profile?.is_admin) redirect('/admin/login?error=not-admin');
 
-  const [{ data: seasons }, { data: cups }, { data: races }, { data: classes }, { data: regions }] = await Promise.all([
+  const [{ data: seasons }, { data: cups }, { data: races }, { data: classes }, { data: regions }, { data: rulesets }] = await Promise.all([
     supabase.from('seasons').select('id,name,is_active,starts_on,ends_on').order('starts_on', { ascending: false }),
-    supabase.from('cups').select('id,name,cup_type,region_id,season_id').order('created_at', { ascending: false }),
+    supabase.from('cups').select('id,name,cup_type,region_id,season_id,ruleset_id,min_races_for_prize,active').order('created_at', { ascending: false }),
     supabase.from('races').select('id,name,race_date,status,cup_id,source_url,location,organizer_club_id,sort_order,import_status,import_error,imported_result_count,imported_at,import_warnings').order('race_date', { ascending: false }),
     supabase.from('classes').select('id,name,aliases').eq('is_official', true).order('sort_order').order('name'),
     supabase.from('regions').select('id,name').order('sort_order'),
+    supabase.from('cup_rulesets').select('id,name,description,points_by_place,participation_points,drop_schedule,min_races_for_prize,club_points_use_all,medal_league_enabled').eq('active',true).order('name'),
   ]);
 
   const selectedRegionId = params.region ?? regions?.[0]?.id ?? '';
@@ -135,7 +136,8 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       <label htmlFor="season_id">Säsong</label><select id="season_id" name="season_id" required defaultValue=""><option value="" disabled>Välj säsong</option>{(seasons??[]).map(s=><option key={s.id} value={s.id}>{s.name}{s.is_active?' (aktiv)':''}</option>)}</select>
       <label htmlFor="cup_name">Cupnamn</label><input id="cup_name" name="name" required placeholder="Syd Cup Vinter 2027" />
       <div className="form-columns"><div><label htmlFor="cup_type">Typ</label><select id="cup_type" name="cup_type" defaultValue="vinter"><option value="vinter">Vintercup</option><option value="sommar">Sommarcup</option></select></div><div><label htmlFor="region_id">Region</label><select id="region_id" name="region_id" required defaultValue=""><option value="" disabled>Välj region</option>{(regions??[]).map(r=><option key={r.id} value={r.id}>{r.name}</option>)}</select></div></div>
-      <button type="submit">Skapa cup</button></form><h3>Befintliga cuper</h3><div className="table-scroll"><table><thead><tr><th>Cup</th><th>Säsong</th><th>Region</th></tr></thead><tbody>{(cups??[]).map(c=><tr key={c.id}><td><strong>{c.name}</strong></td><td>{seasonNameById.get(c.season_id) ?? 'Säsong saknas'}</td><td>{c.region_id ? (regionNameById.get(c.region_id) ?? `Okänd region (${c.region_id})`) : 'Region saknas'}</td></tr>)}</tbody></table></div></section>}
+      <label htmlFor="ruleset_id">Regelverk</label><select id="ruleset_id" name="ruleset_id" required defaultValue=""><option value="" disabled>Välj regelverk</option>{(rulesets??[]).map(r=><option key={r.id} value={r.id}>{r.name}</option>)}</select>
+      <button type="submit">Skapa cup</button></form><h3>Befintliga cuper</h3><div className="cup-settings-list">{(cups??[]).map(c=>{const rs=(rulesets??[]).find(r=>r.id===c.ruleset_id);return <details className="card cup-settings-card" key={c.id} open={params.edit===c.id}><summary><span><strong>{c.name}</strong><small>{seasonNameById.get(c.season_id)??'Säsong saknas'} · {regionNameById.get(c.region_id)??'Region saknas'} · {rs?.name??'Regelverk saknas'}</small></span><span className="badge">{c.active?'Aktiv':'Inaktiv'}</span></summary><form action={updateCupSettings}><input type="hidden" name="cup_id" value={c.id}/><label>Cupnamn<input name="name" defaultValue={c.name} required/></label><label>Regelverk<select name="ruleset_id" defaultValue={c.ruleset_id??''} required>{(rulesets??[]).map(r=><option key={r.id} value={r.id}>{r.name}</option>)}</select></label><label>Minsta antal starter för pris<input name="min_races_for_prize" type="number" min="0" defaultValue={c.min_races_for_prize}/></label><label className="check-row"><input type="checkbox" name="active" value="true" defaultChecked={c.active}/> Aktiv cup</label><button>Spara cupinställningar</button></form>{rs&&<div className="ruleset-summary"><strong>{rs.name}</strong><p>{rs.description}</p><p><b>Poäng:</b> 1:a {rs.points_by_place?.['1']??'–'} · 2:a {rs.points_by_place?.['2']??'–'} · 3:a {rs.points_by_place?.['3']??'–'} · därefter enligt tabell · deltagarpoäng {rs.participation_points}</p><p><b>Klubbkamp:</b> {rs.club_points_use_all?'alla insamlade poäng':'räknade individuella resultat'} · <b>Medaljliga:</b> {rs.medal_league_enabled?'Ja':'Nej'}</p></div>}</details>})}</div></section>}
 
     {section === 'plan' && <section className="card admin-workspace">
       <h2>Tävlingsplan</h2>
