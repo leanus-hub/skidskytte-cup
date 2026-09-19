@@ -694,7 +694,7 @@ export async function updateRulesetClassRule(formData: FormData) {
   const fixedPoints: number | null = scoringMode === 'fixed' ? Number(fixedRaw) : null;
   const medalEligible = text(formData, 'medal_eligible') === 'true';
   if (!rulesetId || !classId || !['standard','fixed','none'].includes(scoringMode) ||
-      (scoringMode === 'fixed' && (!Number.isFinite(fixedPoints) || fixedPoints < 0))) {
+      (scoringMode === 'fixed' && (fixedPoints === null || !Number.isFinite(fixedPoints) || fixedPoints < 0))) {
     redirect(`/admin?section=rules&ruleset=${encodeURIComponent(rulesetId)}&error=class-rule-fields`);
   }
   const { count } = await supabase.from('cups').select('id',{count:'exact',head:true})
