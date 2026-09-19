@@ -160,6 +160,35 @@ export async function movePlannedRace(formData: FormData) {
   revalidatePath('/admin'); redirect(`/admin?section=plan&cup=${encodeURIComponent(cupId)}&success=race-moved`);
 }
 
+export async function deletePlannedRace(formData: FormData) {
+  const supabase = await requireAdmin();
+  const raceId = text(formData, 'race_id');
+  const cupId = text(formData, 'cup_id');
+  if (!raceId || !cupId) redirect('/admin?section=plan&error=delete-fields');
+
+  const { data: race, error: raceError } = await supabase
+    .from('races')
+    .select('id,cup_id,status,import_status,external_race_id,source_url')
+    .eq('id', raceId).eq('cup_id', cupId).single();
+  if (raceError || !race) redirect(`/admin?section=plan&cup=${encodeURIComponent(cupId)}&error=race-not-found`);
+
+  const { count, error: countError } = await supabase
+    .from('results').select('id', { count:'exact', head:true }).eq('race_id', raceId);
+  if (countError) redirect(`/admin?section=plan&cup=${encodeURIComponent(cupId)}&error=${encodeURIComponent(countError.message)}`);
+
+  const safeToDelete = race.status === 'draft'
+    && race.import_status === 'not_imported'
+    && !race.external_race_id
+    && !race.source_url
+    && (count ?? 0) === 0;
+  if (!safeToDelete) redirect(`/admin?section=plan&cup=${encodeURIComponent(cupId)}&error=race-cannot-delete`);
+
+  const { error } = await supabase.from('races').delete().eq('id', raceId).eq('cup_id', cupId);
+  if (error) redirect(`/admin?section=plan&cup=${encodeURIComponent(cupId)}&error=${encodeURIComponent(error.message)}`);
+  revalidatePath('/admin'); revalidatePath('/');
+  redirect(`/admin?section=plan&cup=${encodeURIComponent(cupId)}&success=race-deleted`);
+}
+
 export async function createRace(formData: FormData) {
   const supabase = await requireAdmin();
   const cupId = text(formData, 'cup_id');
