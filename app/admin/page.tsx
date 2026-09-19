@@ -202,7 +202,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     {section === 'import' && <section className="card admin-workspace">
       <h2>Import & publicering</h2>
       <p className="muted">Importera först, granska därefter resultat och cup-poäng innan tävlingen publiceras. DNS, DNF och resultat utanför cupens region visas som information; UNKNOWN kräver kontroll.</p>
-      <div className="import-list">{(races??[]).map(r => {
+      <div className="import-list">{(races??[]).filter(r => !params.cup || r.cup_id === params.cup).map(r => {
         const review = reviewSummaryByRace.get(r.id) ?? { info: 0, needsReview: 0 };
         const imported = r.import_status === 'imported';
         const failed = r.import_status === 'failed';
@@ -226,7 +226,8 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                 <form action={importRaceResultsSafe}><input type="hidden" name="race_id" value={r.id}/><button type="submit">Bekräfta återimport</button></form>
               </div>
             </details>}
-            {!imported && <form action={importRaceResultsSafe}><input type="hidden" name="race_id" value={r.id}/><button type="submit">Importera</button></form>}
+            {!imported && r.source_url && <form action={importRaceResultsSafe}><input type="hidden" name="race_id" value={r.id}/><button type="submit">Importera</button></form>}
+            {!imported && !r.source_url && <Link className="source-button" href={adminHref('plan',{cup:r.cup_id})}>Koppla BiathlonTiming →</Link>}
             {imported && <Link className="source-button" href={`/admin/races/${r.id}`}>Granska resultat</Link>}
             <form action={setRaceStatus}>
               <input type="hidden" name="race_id" value={r.id}/>
