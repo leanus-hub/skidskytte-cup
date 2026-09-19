@@ -278,3 +278,19 @@ tr.outside-region td { color:var(--muted); background:#f7f8fa; }
 .plan-edit-form .check-row { align-self:end; padding-bottom:10px; }
 .plan-edit-form button[type=submit] { grid-column:1/-1; justify-self:end; }
 @media(max-width:800px){.season-plan-item.editable{grid-template-columns:34px 1fr}.season-plan-item.editable>.badge{grid-column:2;justify-self:start}.plan-item-main{align-items:flex-start}.plan-edit{grid-column:1/-1}.plan-edit-form{grid-template-columns:1fr}.plan-edit-form .plan-source,.plan-edit-form button[type=submit]{grid-column:auto}.plan-edit-form .check-row{padding-bottom:0}}
+
+.athlete-race-cards { display:none; }
+.athlete-races-empty { padding:12px 4px 2px; }
+@media(max-width:650px){
+  .athlete-race-table { display:none; }
+  .athlete-race-cards { display:grid; gap:9px; margin-top:10px; }
+  .athlete-race-card { display:grid; gap:10px; padding:12px; border:1px solid var(--border); border-radius:12px; background:#fff; color:var(--text); }
+  .athlete-race-card.dropped { opacity:.62; background:#f7f8fa; }
+  .athlete-race-card > div:first-child { display:grid; gap:3px; }
+  .athlete-race-card > div:first-child small { color:var(--muted); }
+  .athlete-race-card-stats { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+  .athlete-race-card-stats span { display:grid; gap:2px; }
+  .athlete-race-card-stats small { color:var(--muted); font-size:.68rem; text-transform:uppercase; letter-spacing:.03em; }
+  .athlete-race-card-stats strong { font-size:.95rem; }
+  .athlete-race-card .badge { justify-self:start; }
+}
