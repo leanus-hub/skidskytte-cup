@@ -352,3 +352,12 @@ tr.outside-region td { color:var(--muted); background:#f7f8fa; }
 .danger-link:hover { background:transparent; text-decoration:underline; }
 
 .cup-settings-list{display:grid;gap:10px;margin-top:12px}.cup-settings-card summary{display:flex;justify-content:space-between;align-items:center;gap:12px;cursor:pointer}.cup-settings-card summary span:first-child{display:grid;gap:3px}.cup-settings-card summary small{color:var(--muted);font-weight:500}.cup-settings-card form{margin-top:16px}.ruleset-summary{margin-top:16px;padding:14px;border-radius:10px;background:#f3f7f5}.ruleset-summary p{margin:6px 0;color:var(--muted);font-size:.86rem}.ruleset-summary b{color:var(--text)}
+
+/* Admin result workflow */
+.import-workflow{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;margin:10px 0}
+.import-workflow span{padding:7px 6px;border-radius:8px;background:#eef1f5;color:var(--muted);font-size:.7rem;font-weight:800;text-align:center}
+.import-workflow span.done{background:var(--accent-soft);color:var(--accent-dark)}
+.workflow-step-4 .import-workflow span.done{background:#e9f7ef;color:#17613c}
+.workflow-next{margin:10px 0 0;padding:10px 12px;border-left:4px solid var(--yellow);background:#fff9df;border-radius:7px;font-size:.86rem}
+.workflow-next.success-text{border-left-color:#299764;background:#edf9f2;color:#17613c}
+@media(max-width:560px){.import-workflow{grid-template-columns:repeat(2,1fr)}}
