@@ -54,3 +54,4 @@ export default function KontaktPage() {
       <p className="feedback-privacy">Kontaktuppgifter är frivilliga och används bara för att kunna återkoppla kring ditt ärende.</p>
     </form>
   </section>;
+}
