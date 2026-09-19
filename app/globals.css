@@ -361,3 +361,34 @@ tr.outside-region td { color:var(--muted); background:#f7f8fa; }
 .workflow-next{margin:10px 0 0;padding:10px 12px;border-left:4px solid var(--yellow);background:#fff9df;border-radius:7px;font-size:.86rem}
 .workflow-next.success-text{border-left-color:#299764;background:#edf9f2;color:#17613c}
 @media(max-width:560px){.import-workflow{grid-template-columns:repeat(2,1fr)}}
+
+
+/* Feedback */
+.feedback-card{max-width:760px;margin-inline:auto;padding:clamp(22px,5vw,42px)}
+.feedback-card h1{max-width:620px;margin:.3rem 0 .7rem;font-size:clamp(2rem,6vw,3.35rem);line-height:1.04;letter-spacing:-.035em}
+.feedback-intro{max-width:650px;font-size:1.05rem;line-height:1.55;margin-bottom:26px}
+.feedback-form{display:grid;gap:20px}
+.feedback-form label{display:grid;gap:8px;font-weight:800}
+.feedback-form label>span{font-size:.96rem}
+.feedback-form label b{color:#b42318}
+.feedback-form label em{font-style:normal;font-weight:600;color:var(--muted)}
+.feedback-form select,.feedback-form input,.feedback-form textarea{width:100%;box-sizing:border-box;border:1px solid var(--border);border-radius:12px;background:#fff;color:var(--text);font:inherit;padding:13px 14px;outline:none}
+.feedback-form select{min-height:50px}
+.feedback-form textarea{min-height:150px;resize:vertical;line-height:1.45}
+.feedback-form select:focus,.feedback-form input:focus,.feedback-form textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.feedback-form small{color:var(--muted);font-weight:500}
+.feedback-count{justify-self:end;margin-top:-4px}
+.feedback-contact{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.feedback-submit{width:100%;min-height:54px;font-size:1rem;font-weight:900}
+.feedback-privacy{margin:0;padding:12px 14px;border-radius:10px;background:#f4f7f5;color:var(--muted);font-size:.82rem;line-height:1.45}
+.feedback-error{margin:0;color:#9b2c2c;font-weight:700}
+.feedback-success{display:grid;gap:12px}
+.feedback-success button{justify-self:start}
+@media(max-width:600px){
+ .feedback-card{padding:22px 18px;border-radius:18px}
+ .feedback-card h1{font-size:2.15rem}
+ .feedback-intro{font-size:.96rem;margin-bottom:18px}
+ .feedback-form{gap:17px}
+ .feedback-contact{grid-template-columns:1fr}
+ .feedback-form textarea{min-height:145px}
+}
