@@ -27,7 +27,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   const [{ data: seasons }, { data: cups }, { data: races }, { data: classes }, { data: regions }, { data: rulesets }] = await Promise.all([
     supabase.from('seasons').select('id,name,is_active,starts_on,ends_on').order('starts_on', { ascending: false }),
     supabase.from('cups').select('id,name,cup_type,region_id,season_id,ruleset_id,min_races_for_prize,active,lifecycle_status').order('created_at', { ascending: false }),
-    supabase.from('races').select('id,name,race_date,status,cup_id,source_url,location,organizer_club_id,sort_order,import_status,import_error,imported_result_count,imported_at,import_warnings').order('race_date', { ascending: false }),
+    supabase.from('races').select('id,name,race_date,status,cup_id,external_race_id,source_url,location,organizer_club_id,sort_order,import_status,import_error,imported_result_count,imported_at,import_warnings').order('race_date', { ascending: false }),
     supabase.from('classes').select('id,name,aliases').eq('is_official', true).order('sort_order').order('name'),
     supabase.from('regions').select('id,name').order('sort_order'),
     supabase.from('cup_rulesets').select('id,name,description,points_by_place,participation_points,drop_schedule,min_races_for_prize,club_points_use_all,medal_league_enabled').eq('active',true).order('name'),
