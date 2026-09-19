@@ -98,7 +98,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
 
     {params.success && <p className="alert success">{params.success === 'import-complete' ? `Import klar: ${params.count ?? '0'} resultat hämtade. Nästa steg är att granska och publicera.` : params.success === 'race-published' ? 'Tävlingen är publicerad och resultaten syns nu i cupen.' : params.success === 'race-unpublished' ? 'Tävlingen är avpublicerad.' : 'Ändringen är sparad.'}</p>}
     {params.error && <div className="alert error">
-      <strong>Något behöver åtgärdas:</strong> {params.error}
+      <strong>Något behöver åtgärdas:</strong> {params.error === 'cup-completed' ? 'Cupen är avslutad och låst. Ändra cupens status till Pågående om den behöver öppnas för ändringar.' : params.error}
       {section === 'import' && params.error.startsWith('Okänd klubb:') && <p><Link href={adminHref('clubs')}>Öppna Regioner & föreningar och lägg till klubbnamnet som alias →</Link></p>}
       {section === 'import' && params.error.startsWith('Tvetydig klubb:') && <p><Link href={adminHref('clubs')}>Öppna Regioner & föreningar och kontrollera klubbnamnen →</Link></p>}
       {section === 'import' && params.error.startsWith('Okänd klass:') && <p><Link href={adminHref('classes')}>Öppna Klassalias och koppla namnet till rätt klass →</Link></p>}
@@ -144,6 +144,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       <p className="muted">Bygg cupens säsongsplan innan resultatkällor finns. Planerade tävlingar sparas som utkast och påverkar inte cupställningen.</p>
       <form method="get" className="plan-cup-selector"><input type="hidden" name="section" value="plan"/><label htmlFor="plan_cup">Cup</label><select id="plan_cup" name="cup" defaultValue={params.cup ?? ''} required><option value="" disabled>Välj cup</option>{(cups??[]).map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select><button type="submit" className="secondary-dark">Öppna</button></form>
       {params.cup && <>
+        {(cups??[]).find(c=>c.id===params.cup)?.lifecycle_status==='completed' && <p className="alert">Cupen är avslutad. Tävlingsplanen är skrivskyddad tills cupen öppnas igen under Cupinställningar.</p>}
         <div className="season-plan-existing">
           <h3>Nuvarande tävlingsplan</h3>
           {(races??[]).filter(r=>r.cup_id===params.cup).sort((a,b)=>(a.sort_order??0)-(b.sort_order??0)).length===0 && <p className="muted">Inga deltävlingar upplagda ännu.</p>}
@@ -152,16 +153,16 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
             <div className="plan-item-main"><div><strong>{r.name}</strong><p>{r.race_date??'Datum ej satt'}{r.location?` · ${r.location}`:''}{r.organizer_club_id?` · ${clubNameById.get(r.organizer_club_id)??'Arrangör'}`:''}</p></div>
             <div className="plan-item-actions"><form action={movePlannedRace}><input type="hidden" name="race_id" value={r.id}/><input type="hidden" name="cup_id" value={params.cup}/><input type="hidden" name="direction" value="up"/><button className="icon-button" disabled={index===0} title="Flytta upp">↑</button></form><form action={movePlannedRace}><input type="hidden" name="race_id" value={r.id}/><input type="hidden" name="cup_id" value={params.cup}/><input type="hidden" name="direction" value="down"/><button className="icon-button" disabled={index===arr.length-1} title="Flytta ner">↓</button></form></div></div>
             <span className={`badge ${r.status==='published'?'success-badge':''}`}>{r.status==='cancelled'?'Inställd':r.status==='published'?'Publicerad':r.import_status==='imported'?'Importerad':r.source_url?'Redo för import':'Planerad'}</span>
-            <details className="plan-edit"><summary>Redigera</summary><form action={updatePlannedRace} className="plan-edit-form"><input type="hidden" name="race_id" value={r.id}/><input type="hidden" name="cup_id" value={params.cup}/>
+            {(cups??[]).find(c=>c.id===params.cup)?.lifecycle_status!=='completed' && <details className="plan-edit"><summary>Redigera</summary><form action={updatePlannedRace} className="plan-edit-form"><input type="hidden" name="race_id" value={r.id}/><input type="hidden" name="cup_id" value={params.cup}/>
               <label>Namn<input name="name" defaultValue={r.name} required/></label><label>Datum<input name="race_date" type="date" defaultValue={r.race_date??''}/></label><label>Ort<input name="location" defaultValue={r.location??''}/></label>
               <label>Arrangör<select name="organizer_club_id" defaultValue={r.organizer_club_id??''}><option value="">Välj klubb</option>{clubs.map(club=><option value={club.id} key={club.id}>{club.name}</option>)}</select></label>
               <label className="plan-source">BiathlonTiming-länk<input name="source_url" type="url" defaultValue={r.source_url??''} placeholder="https://results.biathlontiming.se/?raceId=..."/></label>
               <label className="check-row"><input type="checkbox" name="cancelled" value="true" defaultChecked={r.status==='cancelled'}/> Inställd tävling</label><button type="submit">Spara ändringar</button>
-            </form></details>
-            {r.status==='draft' && r.import_status==='not_imported' && !r.source_url && !r.external_race_id && <form action={deletePlannedRace} className="delete-planned-race-form"><input type="hidden" name="race_id" value={r.id}/><input type="hidden" name="cup_id" value={params.cup}/><button type="submit" className="danger-link">Ta bort planerad tävling</button></form>}
+            </form></details>}
+            {(cups??[]).find(c=>c.id===params.cup)?.lifecycle_status!=='completed' && r.status==='draft' && r.import_status==='not_imported' && !r.source_url && !r.external_race_id && <form action={deletePlannedRace} className="delete-planned-race-form"><input type="hidden" name="race_id" value={r.id}/><input type="hidden" name="cup_id" value={params.cup}/><button type="submit" className="danger-link">Ta bort planerad tävling</button></form>}
           </article>)}
         </div>
-        <CupPlanBuilder cupId={params.cup} existingCount={(races??[]).filter(r=>r.cup_id===params.cup).length} clubs={clubs.map(c=>({id:c.id,name:c.name}))}/>
+        {(cups??[]).find(c=>c.id===params.cup)?.lifecycle_status!=='completed' && <CupPlanBuilder cupId={params.cup} existingCount={(races??[]).filter(r=>r.cup_id===params.cup).length} clubs={clubs.map(c=>({id:c.id,name:c.name}))}/>}
       </>}
     </section>}
 
@@ -203,7 +204,8 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
         const imported = r.import_status === 'imported';
         const failed = r.import_status === 'failed';
         const published = r.status === 'published';
-        const canPublish = imported && review.needsReview === 0;
+        const cupCompleted = (cups??[]).find(c=>c.id===r.cup_id)?.lifecycle_status === 'completed';
+        const canPublish = imported && review.needsReview === 0 && !cupCompleted;
         const step = published ? 4 : imported ? 3 : r.source_url ? 2 : 1;
         return <article className={`import-card workflow-step-${step}`} key={r.id}>
           <div>
@@ -220,7 +222,8 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
             {r.import_error && <p className="error-text">{r.import_error}</p>}
           </div>
           <div className="import-actions">
-            {imported && <details>
+            {cupCompleted && <span className="badge">Avslutad · låst</span>}
+            {!cupCompleted && imported && <details>
               <summary className="source-button">Återimportera</summary>
               <div className="card">
                 <p><strong>Säker återimport</strong></p>
@@ -228,16 +231,16 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                 <form action={importRaceResultsSafe}><input type="hidden" name="race_id" value={r.id}/><button type="submit">Bekräfta återimport</button></form>
               </div>
             </details>}
-            {!imported && r.source_url && <form action={importRaceResultsSafe}><input type="hidden" name="race_id" value={r.id}/><button type="submit">2. Importera resultat</button></form>}
-            {!imported && !r.source_url && <Link className="source-button" href={adminHref('plan',{cup:r.cup_id})}>1. Koppla BiathlonTiming →</Link>}
+            {!cupCompleted && !imported && r.source_url && <form action={importRaceResultsSafe}><input type="hidden" name="race_id" value={r.id}/><button type="submit">2. Importera resultat</button></form>}
+            {!cupCompleted && !imported && !r.source_url && <Link className="source-button" href={adminHref('plan',{cup:r.cup_id})}>1. Koppla BiathlonTiming →</Link>}
             {imported && <Link className="source-button" href={`/admin/races/${r.id}`}>{published ? 'Visa granskning' : '3. Granska resultat →'}</Link>}
-            <form action={setRaceStatus}>
+            {!cupCompleted && <form action={setRaceStatus}>
               <input type="hidden" name="race_id" value={r.id}/>
               <input type="hidden" name="status" value={r.status === 'published' ? 'draft' : 'published'}/>
               <button className="secondary-dark" type="submit" disabled={r.status !== 'published' && !canPublish} title={r.status !== 'published' && !canPublish ? 'Importera resultat och åtgärda blockerande varningar före publicering.' : undefined}>
                 {r.status === 'published' ? 'Avpublicera' : '4. Publicera'}
               </button>
-            </form>
+            </form>}
           </div>
         </article>;
       })}</div>
