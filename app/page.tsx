@@ -7,6 +7,7 @@ export const dynamic = 'force-dynamic';
 
 type Region = { id:string; name:string; sort_order:number };
 type Cup = { id:string; name:string; season_id:string; region_id:string|null };
+type CompetitionClass = { id:string; name:string; sort_order:number };
 type Standing = {
   cup_id: string; cup_name: string; season_name: string; class_id: string; class_name: string;
   athlete_id: string; athlete_name: string; club_name: string; cup_place: number; total_points: number;
@@ -42,9 +43,10 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const athleteQuery = (params.q ?? '').trim();
   const normalizedAthleteQuery = athleteQuery.toLocaleLowerCase('sv-SE');
   const supabase = await createClient();
-  const [{data:regionRows,error:regionsError},{data:cupRows,error:cupsError},{data:standings,error},{data:breakdown},{data:classRows},{data:clubRows},{data:raceStats},{data:plannedRaceRows}] = await Promise.all([
+  const [{data:regionRows,error:regionsError},{data:cupRows,error:cupsError},{data:competitionClassRows},{data:standings,error},{data:breakdown},{data:classRows},{data:clubRows},{data:raceStats},{data:plannedRaceRows}] = await Promise.all([
     supabase.from('regions').select('id,name,sort_order').order('sort_order'),
     supabase.from('cups').select('id,name,season_id,region_id').order('created_at', { ascending: false }),
+    supabase.from('classes').select('id,name,sort_order').order('sort_order'),
     supabase.from('cup_standings').select('*').order('cup_name').order('class_name').order('cup_place'),
     supabase.from('cup_result_breakdown').select('cup_id,class_id,athlete_id,race_id,race_name,region_place,cup_points,shooting_hits,shooting_shots,is_counted').order('race_date').order('sort_order'),
     supabase.from('cup_class_standings').select('*').order('cup_name').order('class_name'),
@@ -63,6 +65,8 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
 
   const regions = (regionRows ?? []) as Region[];
   const cups = (cupRows ?? []) as unknown as Cup[];
+  const competitionClasses = (competitionClassRows ?? []) as CompetitionClass[];
+  const classSortOrder = new Map(competitionClasses.map(row => [row.id,row.sort_order]));
   const individual = (standings ?? []) as Standing[];
   const details = (breakdown ?? []) as Breakdown[];
   const classes = (classRows ?? []) as ClassStanding[];
@@ -163,7 +167,10 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         {view==='club' && cupClubs.length === 0 && <div className="card empty-state"><h3>Ingen klubbsammanställning ännu</h3><p className="muted">Klubbpoäng visas när publicerade resultat finns.</p></div>}
         {view==='statistics' && cupStatistics.length === 0 && <div className="card empty-state"><h3>Ingen cupstatistik ännu</h3><p className="muted">Statistik visas när cupens deltävlingar har importerats och publicerats.</p></div>}
 
-        {view==='individual' && Array.from(new Set(filteredCupIndividuals.map(r=>r.class_name))).map(className => {
+        {view==='individual' && Array.from(new Set(filteredCupIndividuals.map(r=>r.class_name))).sort((a,b)=>{
+          const aRow=filteredCupIndividuals.find(r=>r.class_name===a), bRow=filteredCupIndividuals.find(r=>r.class_name===b);
+          return (classSortOrder.get(aRow?.class_id??'')??9999)-(classSortOrder.get(bRow?.class_id??'')??9999) || a.localeCompare(b,'sv');
+        }).map(className => {
           const rows=filteredCupIndividuals.filter(r=>r.class_name===className);
           return <section key={className} className="card standings-card"><h3>{className}</h3><div className="table-scroll"><table>
             <thead><tr><th>Plats</th><th>Åkare</th><th>Klubb</th><th>Poäng</th><th>Skytte</th><th>Starter</th><th>Pris</th></tr></thead>
@@ -177,7 +184,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           </table></div></section>;
         })}
 
-        {view==='class' && <section className="card standings-card"><h3>Sammanställning per klass</h3><div className="table-scroll"><table><thead><tr><th>Klass</th><th>Aktiva</th><th>Starter</th><th>Samlad poäng</th><th>Träffprocent</th></tr></thead><tbody>{classes.filter(r=>r.cup_id===cupId).map(row=><tr key={row.class_id}><td><strong>{row.class_name}</strong></td><td>{row.athlete_count}</td><td>{row.total_starts}</td><td>{row.total_points}</td><td>{pct(row.shooting_percentage)}</td></tr>)}</tbody></table></div></section>}
+        {view==='class' && <section className="card standings-card"><h3>Sammanställning per klass</h3><div className="table-scroll"><table><thead><tr><th>Klass</th><th>Aktiva</th><th>Starter</th><th>Samlad poäng</th><th>Träffprocent</th></tr></thead><tbody>{classes.filter(r=>r.cup_id===cupId).sort((a,b)=>(classSortOrder.get(a.class_id)??9999)-(classSortOrder.get(b.class_id)??9999) || a.class_name.localeCompare(b.class_name,'sv')).map(row=><tr key={row.class_id}><td><strong>{row.class_name}</strong></td><td>{row.athlete_count}</td><td>{row.total_starts}</td><td>{row.total_points}</td><td>{pct(row.shooting_percentage)}</td></tr>)}</tbody></table></div></section>}
 
         {view==='club' && <>
           <nav className="sub-tabs" aria-label="Klubbliga">
