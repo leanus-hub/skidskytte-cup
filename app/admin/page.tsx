@@ -17,7 +17,7 @@ function adminHref(section: string, params: Record<string,string|undefined> = {}
 
 export default async function AdminPage({ searchParams }: { searchParams: Promise<Params> }) {
   const params = await searchParams;
-  const section = ['season','cup','plan','race','import','classes','clubs','admins'].includes(params.section ?? '') ? params.section! : 'home';
+  const section = ['season','cup','plan','import','classes','clubs','admins'].includes(params.section ?? '') ? params.section! : 'home';
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect('/admin/login');
@@ -151,7 +151,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
           {(races??[]).filter(r=>r.cup_id===params.cup).sort((a,b)=>(a.sort_order??0)-(b.sort_order??0)).map((r,index,arr)=><article className="season-plan-item editable" key={r.id}>
             <span className="plan-number">{index+1}</span>
             <div className="plan-item-main"><div><strong>{r.name}</strong><p>{r.race_date??'Datum ej satt'}{r.location?` · ${r.location}`:''}{r.organizer_club_id?` · ${clubNameById.get(r.organizer_club_id)??'Arrangör'}`:''}</p></div>
-            <div className="plan-item-actions"><form action={movePlannedRace}><input type="hidden" name="race_id" value={r.id}/><input type="hidden" name="cup_id" value={params.cup}/><input type="hidden" name="direction" value="up"/><button className="icon-button" disabled={index===0} title="Flytta upp">↑</button></form><form action={movePlannedRace}><input type="hidden" name="race_id" value={r.id}/><input type="hidden" name="cup_id" value={params.cup}/><input type="hidden" name="direction" value="down"/><button className="icon-button" disabled={index===arr.length-1} title="Flytta ner">↓</button></form></div></div>
+            {(cups??[]).find(c=>c.id===params.cup)?.lifecycle_status!=='completed' && <div className="plan-item-actions"><form action={movePlannedRace}><input type="hidden" name="race_id" value={r.id}/><input type="hidden" name="cup_id" value={params.cup}/><input type="hidden" name="direction" value="up"/><button className="icon-button" disabled={index===0} title="Flytta upp">↑</button></form><form action={movePlannedRace}><input type="hidden" name="race_id" value={r.id}/><input type="hidden" name="cup_id" value={params.cup}/><input type="hidden" name="direction" value="down"/><button className="icon-button" disabled={index===arr.length-1} title="Flytta ner">↓</button></form></div>}</div>
             <span className={`badge ${r.status==='published'?'success-badge':''}`}>{r.status==='cancelled'?'Inställd':r.status==='published'?'Publicerad':r.import_status==='imported'?'Importerad':r.source_url?'Redo för import':'Planerad'}</span>
             {(cups??[]).find(c=>c.id===params.cup)?.lifecycle_status!=='completed' && <details className="plan-edit"><summary>Redigera</summary><form action={updatePlannedRace} className="plan-edit-form"><input type="hidden" name="race_id" value={r.id}/><input type="hidden" name="cup_id" value={params.cup}/>
               <label>Namn<input name="name" defaultValue={r.name} required/></label><label>Datum<input name="race_date" type="date" defaultValue={r.race_date??''}/></label><label>Ort<input name="location" defaultValue={r.location??''}/></label>
