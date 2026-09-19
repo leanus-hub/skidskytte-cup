@@ -641,3 +641,60 @@ export async function inviteAdmin(formData: FormData) {
   revalidatePath('/admin');
   redirect('/admin?section=admins&success=admin-invited');
 }
+
+
+export async function cloneRuleset(formData: FormData) {
+  const supabase = await requireAdmin();
+  const sourceId = text(formData, 'source_ruleset_id');
+  const name = text(formData, 'name');
+  const code = text(formData, 'code').toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '');
+  if (!sourceId || !name || !code) redirect('/admin?section=rules&error=ruleset-fields');
+
+  const { data: source, error: sourceError } = await supabase.from('cup_rulesets')
+    .select('description,points_by_place,participation_points,drop_schedule,min_races_for_prize,club_points_use_all,medal_league_enabled')
+    .eq('id', sourceId).single();
+  if (sourceError || !source) redirect('/admin?section=rules&error=ruleset-source');
+
+  const { data: created, error } = await supabase.from('cup_rulesets').insert({
+    code, name, description: source.description, points_by_place: source.points_by_place,
+    participation_points: source.participation_points, drop_schedule: source.drop_schedule,
+    min_races_for_prize: source.min_races_for_prize, club_points_use_all: source.club_points_use_all,
+    medal_league_enabled: source.medal_league_enabled, active: true,
+  }).select('id').single();
+  if (error || !created) redirect(`/admin?section=rules&error=${encodeURIComponent(error?.message ?? 'ruleset-create')}`);
+
+  const { data: classRules } = await supabase.from('cup_ruleset_class_rules')
+    .select('class_id,scoring_mode,fixed_points,medal_eligible').eq('ruleset_id', sourceId);
+  if (classRules?.length) {
+    const { error: classError } = await supabase.from('cup_ruleset_class_rules').insert(
+      classRules.map(r => ({ ...r, ruleset_id: created.id }))
+    );
+    if (classError) redirect(`/admin?section=rules&ruleset=${created.id}&error=${encodeURIComponent(classError.message)}`);
+  }
+  revalidatePath('/admin');
+  redirect(`/admin?section=rules&ruleset=${created.id}&success=ruleset-created`);
+}
+
+export async function updateRulesetClassRule(formData: FormData) {
+  const supabase = await requireAdmin();
+  const rulesetId = text(formData, 'ruleset_id'), classId = text(formData, 'class_id');
+  const scoringMode = text(formData, 'scoring_mode');
+  const fixedRaw = text(formData, 'fixed_points');
+  const fixedPoints = scoringMode === 'fixed' ? Number(fixedRaw) : null;
+  const medalEligible = text(formData, 'medal_eligible') === 'true';
+  if (!rulesetId || !classId || !['standard','fixed','none'].includes(scoringMode) ||
+      (scoringMode === 'fixed' && (!Number.isFinite(fixedPoints) || fixedPoints < 0))) {
+    redirect(`/admin?section=rules&ruleset=${encodeURIComponent(rulesetId)}&error=class-rule-fields`);
+  }
+  const { count } = await supabase.from('cups').select('id',{count:'exact',head:true})
+    .eq('ruleset_id',rulesetId).eq('lifecycle_status','completed');
+  if ((count ?? 0) > 0) redirect(`/admin?section=rules&ruleset=${rulesetId}&error=ruleset-locked`);
+
+  const { error } = await supabase.from('cup_ruleset_class_rules').upsert({
+    ruleset_id: rulesetId, class_id: classId, scoring_mode: scoringMode,
+    fixed_points: fixedPoints, medal_eligible: medalEligible,
+  }, { onConflict: 'ruleset_id,class_id' });
+  if (error) redirect(`/admin?section=rules&ruleset=${rulesetId}&error=${encodeURIComponent(error.message)}`);
+  revalidatePath('/admin'); revalidatePath('/');
+  redirect(`/admin?section=rules&ruleset=${rulesetId}&success=ruleset-updated`);
+}
