@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
-import { addClassAlias, createCup, createSeason, deletePlannedRace, inviteAdmin, logout, setAdminRole, setRaceStatus, updatePlannedRace, movePlannedRace, updateCupSettings, cloneRuleset, updateRulesetClassRule } from './admin-actions';
+import { addClassAlias, createCup, createSeason, deletePlannedRace, inviteAdmin, logout, setAdminRole, setRaceStatus, updatePlannedRace, movePlannedRace, updateCupSettings, cloneRuleset, updateRulesetClassRule, updateFeedbackItem } from './admin-actions';
 import { importRaceResultsSafe } from './import-actions';
 import ClubManager from './club-manager';
 import CupPlanBuilder from './cup-plan-builder';
@@ -17,7 +17,7 @@ function adminHref(section: string, params: Record<string,string|undefined> = {}
 
 export default async function AdminPage({ searchParams }: { searchParams: Promise<Params> }) {
   const params = await searchParams;
-  const section = ['season','cup','rules','plan','import','classes','clubs','admins'].includes(params.section ?? '') ? params.section! : 'home';
+  const section = ['season','cup','rules','plan','import','feedback','classes','clubs','admins'].includes(params.section ?? '') ? params.section! : 'home';
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect('/admin/login');
@@ -32,6 +32,13 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     supabase.from('regions').select('id,name').order('sort_order'),
     supabase.from('cup_rulesets').select('id,name,description,points_by_place,participation_points,drop_schedule,min_races_for_prize,club_points_use_all,medal_league_enabled').eq('active',true).order('name'),
   ]);
+
+  let feedbackItems: {id:string;created_at:string;type:string;status:string;priority:string;message:string;name:string|null;email:string|null;page_url:string|null;admin_note:string|null;roadmap_ref:string|null}[] = [];
+  if (section === 'feedback') {
+    const { data, error } = await supabase.from('feedback_items').select('*').order('created_at',{ascending:false});
+    if (error) throw new Error(`Kunde inte läsa ärenden: ${error.message}`);
+    feedbackItems = data ?? [];
+  }
 
   let rulesetClassRules: {ruleset_id:string;class_id:string;scoring_mode:string;fixed_points:number|null;medal_eligible:boolean}[] = [];
   if (section === 'rules') {
@@ -91,7 +98,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
 
   const nav = [
     ['home','Översikt'], ['season','Ny säsong'], ['cup','Ny cup'], ['rules','Regelverk'], ['plan','Tävlingsplan'],
-    ['import','Resultatflöde'], ['classes','Klassalias'], ['clubs','Regioner & föreningar'], ['admins','Administratörer'],
+    ['import','Resultatflöde'], ['feedback','Ärenden'], ['classes','Klassalias'], ['clubs','Regioner & föreningar'], ['admins','Administratörer'],
   ];
 
   return <>
@@ -179,6 +186,13 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
         <form action={cloneRuleset}><input type="hidden" name="source_ruleset_id" value={rs.id}/><div className="form-columns"><label>Nytt namn<input name="name" required placeholder="Syd Cup 2027"/></label><label>Kod<input name="code" required placeholder="syd-cup-2027"/></label></div><button className="secondary-dark">Skapa ny version från detta regelverk</button></form>
         <div className="table-scroll"><table><thead><tr><th>Klass</th><th>Poängmodell</th><th>Fast poäng</th><th>Medaljliga</th><th></th></tr></thead><tbody>{(classes??[]).map(cl=>{const rule=rulesetClassRules.find(r=>r.ruleset_id===rs.id&&r.class_id===cl.id);return <tr key={cl.id}><td><strong>{cl.name}</strong></td><td colSpan={4}>{locked?<span>{rule?.scoring_mode==='fixed'?`Fast (${rule.fixed_points})`:rule?.scoring_mode==='none'?'Ingen':'Standard'} · Medaljliga {rule?.medal_eligible===false?'Nej':'Ja'}</span>:<form action={updateRulesetClassRule} className="form-columns"><input type="hidden" name="ruleset_id" value={rs.id}/><input type="hidden" name="class_id" value={cl.id}/><select name="scoring_mode" defaultValue={rule?.scoring_mode??'standard'}><option value="standard">Standard</option><option value="fixed">Fast</option><option value="none">Ingen</option></select><input name="fixed_points" type="number" min="0" defaultValue={rule?.fixed_points??''} placeholder="Fast poäng"/><label className="check-row"><input type="checkbox" name="medal_eligible" value="true" defaultChecked={rule?.medal_eligible!==false}/> Medalj</label><button>Spara</button></form>}</td></tr>})}</tbody></table></div>
       </details>})}
+    </section>}
+
+    {section === 'feedback' && <section className="card admin-workspace"><h2>Ärenden & förbättringar</h2><p className="muted">Feedback från besökare. Prioritera här och koppla planerade förbättringar till roadmapen.</p>
+      {feedbackItems.length===0?<p>Inga ärenden ännu.</p>:feedbackItems.map(item=><details className="card cup-settings-card" key={item.id}><summary><span><strong>{item.type==='result_error'?'Resultatfel':item.type==='data_error'?'Datafel':item.type==='technical'?'Tekniskt fel':'Förbättring'}</strong><small>{new Date(item.created_at).toLocaleDateString('sv-SE')} · {item.message.slice(0,90)}</small></span><span className="badge">{item.priority} · {item.status}</span></summary>
+        <p>{item.message}</p>{item.page_url&&<p className="muted">Sida: {item.page_url}</p>}{(item.name||item.email)&&<p className="muted">Kontakt: {[item.name,item.email].filter(Boolean).join(' · ')}</p>}
+        <form action={updateFeedbackItem}><input type="hidden" name="id" value={item.id}/><div className="form-columns"><label>Status<select name="status" defaultValue={item.status}><option value="new">Ny</option><option value="planned">Planerad</option><option value="in_progress">Pågår</option><option value="done">Klar</option><option value="rejected">Avvisad</option></select></label><label>Prioritet<select name="priority" defaultValue={item.priority}><option value="low">Låg</option><option value="normal">Normal</option><option value="high">Hög</option><option value="critical">Kritisk</option></select></label></div><label>Roadmap<input name="roadmap_ref" defaultValue={item.roadmap_ref??''} placeholder="t.ex. v1.6 Statistik"/></label><label>Adminnotering<textarea name="admin_note" rows={3} defaultValue={item.admin_note??''}/></label><button>Spara ärende</button></form>
+      </details>)}
     </section>}
 
     {section === 'classes' && <section className="card admin-workspace"><h2>Klassalias</h2><p className="muted">Klasserna och tidigare alias behålls. Lägg endast till alternativa namn som förekommer i importen.</p><form action={addClassAlias}>
