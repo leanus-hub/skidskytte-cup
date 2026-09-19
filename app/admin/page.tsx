@@ -83,8 +83,8 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   });
 
   const nav = [
-    ['home','Översikt'], ['season','Ny säsong'], ['cup','Ny cup'], ['plan','Tävlingsplan'], ['race','Koppla resultat'],
-    ['import','Import & publicering'], ['classes','Klassalias'], ['clubs','Regioner & föreningar'], ['admins','Administratörer'],
+    ['home','Översikt'], ['season','Ny säsong'], ['cup','Ny cup'], ['plan','Tävlingsplan'],
+    ['import','Resultatflöde'], ['classes','Klassalias'], ['clubs','Regioner & föreningar'], ['admins','Administratörer'],
   ];
 
   return <>
@@ -96,7 +96,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       {nav.map(([key,label]) => <Link key={key} className={section===key?'active':''} href={adminHref(key)}>{label}</Link>)}
     </nav>
 
-    {params.success && <p className="alert success">Ändringen är sparad.</p>}
+    {params.success && <p className="alert success">{params.success === 'import-complete' ? `Import klar: ${params.count ?? '0'} resultat hämtade. Nästa steg är att granska och publicera.` : params.success === 'race-published' ? 'Tävlingen är publicerad och resultaten syns nu i cupen.' : params.success === 'race-unpublished' ? 'Tävlingen är avpublicerad.' : 'Ändringen är sparad.'}</p>}
     {params.error && <div className="alert error">
       <strong>Något behöver åtgärdas:</strong> {params.error}
       {section === 'import' && params.error.startsWith('Okänd klubb:') && <p><Link href={adminHref('clubs')}>Öppna Regioner & föreningar och lägg till klubbnamnet som alias →</Link></p>}
@@ -165,13 +165,6 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       </>}
     </section>}
 
-    {section === 'race' && <section className="card admin-workspace"><h2>Koppla tävling till cup</h2><form action={createRace}>
-      <label htmlFor="cup_id">Cup</label><select id="cup_id" name="cup_id" required defaultValue=""><option value="" disabled>Välj cup</option>{(cups??[]).map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select>
-      <label htmlFor="race_name">Tävlingsnamn</label><input id="race_name" name="name" required placeholder="Deltävling 1 – Hestra" />
-      <label htmlFor="race_date">Datum</label><input id="race_date" name="race_date" type="date" />
-      <label htmlFor="source_url">BiathlonTiming-länk</label><input id="source_url" name="source_url" type="url" required placeholder="https://results.biathlontiming.se/?raceId=..." />
-      <button type="submit">Koppla tävlingen</button></form></section>}
-
     {section === 'classes' && <section className="card admin-workspace"><h2>Klassalias</h2><p className="muted">Klasserna och tidigare alias behålls. Lägg endast till alternativa namn som förekommer i importen.</p><form action={addClassAlias}>
       <label htmlFor="class_id">Officiell klass</label><select id="class_id" name="class_id" required defaultValue=""><option value="" disabled>Välj klass</option>{(classes??[]).map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select>
       <label htmlFor="class_alias">Nytt alias</label><input id="class_alias" name="alias" required placeholder="Pojkar 10-11 Massstart" /><button type="submit">Lägg till alias</button></form>
@@ -203,21 +196,27 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     </section>}
 
     {section === 'import' && <section className="card admin-workspace">
-      <h2>Import & publicering</h2>
-      <p className="muted">Importera först, granska därefter resultat och cup-poäng innan tävlingen publiceras. DNS, DNF och resultat utanför cupens region visas som information; UNKNOWN kräver kontroll.</p>
-      <div className="import-list">{(races??[]).filter(r => !params.cup || r.cup_id === params.cup).map(r => {
+      <h2>Resultatflöde</h2>
+      <p className="muted">Följ tävlingen från BiathlonTiming till publicerade cupresultat. 1. Koppla källa → 2. Importera → 3. Granska → 4. Publicera.</p>
+      <div className="import-list">{(races??[]).filter(r => !params.cup || r.cup_id === params.cup).sort((a,b)=>(a.sort_order??999)-(b.sort_order??999)).map(r => {
         const review = reviewSummaryByRace.get(r.id) ?? { info: 0, needsReview: 0 };
         const imported = r.import_status === 'imported';
         const failed = r.import_status === 'failed';
+        const published = r.status === 'published';
         const canPublish = imported && review.needsReview === 0;
-        return <article className="import-card" key={r.id}>
+        const step = published ? 4 : imported ? 3 : r.source_url ? 2 : 1;
+        return <article className={`import-card workflow-step-${step}`} key={r.id}>
           <div>
             <strong>{r.name}</strong>
             <p className="muted import-meta">{cupNameById.get(r.cup_id) ?? 'Cup saknas'} · {r.race_date ?? 'Datum saknas'}</p>
-            <span className="badge">{imported ? `${r.imported_result_count ?? 0} importerade` : failed ? 'Importfel' : 'Inte importerad'}</span>
+            <div className="import-workflow" aria-label="Importsteg">
+              <span className={step>=1?'done':''}>1 Källa</span><span className={step>=2?'done':''}>2 Import</span><span className={step>=3?'done':''}>3 Granska</span><span className={step>=4?'done':''}>4 Publicera</span>
+            </div>
+            <span className={`badge ${published?'success-badge':''}`}>{published ? 'Publicerad' : imported ? `${r.imported_result_count ?? 0} resultat importerade` : failed ? 'Importfel' : r.source_url ? 'Redo för import' : 'Källa saknas'}</span>
             {imported && review.needsReview > 0 && <p className="error-text"><strong>{review.needsReview} behöver kontrolleras</strong> före publicering.</p>}
             {imported && review.info > 0 && <p className="muted">{review.info} informationsnoteringar (t.ex. DNS, DNF eller utanför region).</p>}
-            {imported && review.needsReview === 0 && <p className="muted">Granskningskontroll: inga blockerande varningar.</p>}
+            {imported && review.needsReview === 0 && !published && <p className="workflow-next"><strong>Nästa steg:</strong> Granska resultat och publicera tävlingen.</p>}
+            {published && <p className="workflow-next success-text"><strong>Klart:</strong> Resultaten är publicerade i cupen.</p>}
             {r.import_error && <p className="error-text">{r.import_error}</p>}
           </div>
           <div className="import-actions">
@@ -229,14 +228,14 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                 <form action={importRaceResultsSafe}><input type="hidden" name="race_id" value={r.id}/><button type="submit">Bekräfta återimport</button></form>
               </div>
             </details>}
-            {!imported && r.source_url && <form action={importRaceResultsSafe}><input type="hidden" name="race_id" value={r.id}/><button type="submit">Importera</button></form>}
-            {!imported && !r.source_url && <Link className="source-button" href={adminHref('plan',{cup:r.cup_id})}>Koppla BiathlonTiming →</Link>}
-            {imported && <Link className="source-button" href={`/admin/races/${r.id}`}>Granska resultat</Link>}
+            {!imported && r.source_url && <form action={importRaceResultsSafe}><input type="hidden" name="race_id" value={r.id}/><button type="submit">2. Importera resultat</button></form>}
+            {!imported && !r.source_url && <Link className="source-button" href={adminHref('plan',{cup:r.cup_id})}>1. Koppla BiathlonTiming →</Link>}
+            {imported && <Link className="source-button" href={`/admin/races/${r.id}`}>{published ? 'Visa granskning' : '3. Granska resultat →'}</Link>}
             <form action={setRaceStatus}>
               <input type="hidden" name="race_id" value={r.id}/>
               <input type="hidden" name="status" value={r.status === 'published' ? 'draft' : 'published'}/>
               <button className="secondary-dark" type="submit" disabled={r.status !== 'published' && !canPublish} title={r.status !== 'published' && !canPublish ? 'Importera resultat och åtgärda blockerande varningar före publicering.' : undefined}>
-                {r.status === 'published' ? 'Avpublicera' : 'Publicera'}
+                {r.status === 'published' ? 'Avpublicera' : '4. Publicera'}
               </button>
             </form>
           </div>
