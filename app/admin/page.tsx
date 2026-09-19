@@ -17,7 +17,7 @@ function adminHref(section: string, params: Record<string,string|undefined> = {}
 
 export default async function AdminPage({ searchParams }: { searchParams: Promise<Params> }) {
   const params = await searchParams;
-  const section = ['season','cup','plan','import','classes','clubs','admins'].includes(params.section ?? '') ? params.section! : 'home';
+  const section = ['season','cup','rules','plan','import','classes','clubs','admins'].includes(params.section ?? '') ? params.section! : 'home';
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect('/admin/login');
@@ -28,10 +28,17 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     supabase.from('seasons').select('id,name,is_active,starts_on,ends_on').order('starts_on', { ascending: false }),
     supabase.from('cups').select('id,name,cup_type,region_id,season_id,ruleset_id,min_races_for_prize,active,lifecycle_status').order('created_at', { ascending: false }),
     supabase.from('races').select('id,name,race_date,status,cup_id,external_race_id,source_url,location,organizer_club_id,sort_order,import_status,import_error,imported_result_count,imported_at,import_warnings').order('race_date', { ascending: false }),
-    supabase.from('classes').select('id,name,aliases').eq('is_official', true).order('sort_order').order('name'),
+    supabase.from('classes').select('id,name,aliases,sort_order').eq('is_official', true).order('sort_order').order('name'),
     supabase.from('regions').select('id,name').order('sort_order'),
     supabase.from('cup_rulesets').select('id,name,description,points_by_place,participation_points,drop_schedule,min_races_for_prize,club_points_use_all,medal_league_enabled').eq('active',true).order('name'),
   ]);
+
+  let rulesetClassRules: {ruleset_id:string;class_id:string;scoring_mode:string;fixed_points:number|null;medal_eligible:boolean}[] = [];
+  if (section === 'rules') {
+    const { data, error } = await supabase.from('cup_ruleset_class_rules').select('ruleset_id,class_id,scoring_mode,fixed_points,medal_eligible');
+    if (error) throw new Error(`Kunde inte läsa klassregler: ${error.message}`);
+    rulesetClassRules = data ?? [];
+  }
 
   const selectedRegionId = params.region ?? regions?.[0]?.id ?? '';
   let adminProfiles: { id: string; display_name: string | null; is_admin: boolean }[] = [];
@@ -83,7 +90,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   });
 
   const nav = [
-    ['home','Översikt'], ['season','Ny säsong'], ['cup','Ny cup'], ['plan','Tävlingsplan'],
+    ['home','Översikt'], ['season','Ny säsong'], ['cup','Ny cup'], ['rules','Regelverk'], ['plan','Tävlingsplan'],
     ['import','Resultatflöde'], ['classes','Klassalias'], ['clubs','Regioner & föreningar'], ['admins','Administratörer'],
   ];
 
@@ -164,6 +171,13 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
         </div>
         {(cups??[]).find(c=>c.id===params.cup)?.lifecycle_status!=='completed' && <CupPlanBuilder cupId={params.cup} existingCount={(races??[]).filter(r=>r.cup_id===params.cup).length} clubs={clubs.map(c=>({id:c.id,name:c.name}))}/>}
       </>}
+    </section>}
+
+    {section === 'rules' && <section className="card admin-workspace"><h2>Regelverk</h2><p className="muted">Regelverket styr poäng, strykresultat och vilka klasser som ingår i medaljligan. Avslutade cuper behåller sitt regelverk.</p>
+      {(rulesets??[]).map(rs=><details className="card cup-settings-card" key={rs.id} open={params.ruleset===rs.id}><summary><span><strong>{rs.name}</strong><small>{rs.description}</small></span><span className="badge">{rs.medal_league_enabled?'Medaljliga':'Ingen medaljliga'}</span></summary>
+        <div className="ruleset-summary"><p><b>Poäng:</b> 1:a {rs.points_by_place?.['1']??'–'} · 2:a {rs.points_by_place?.['2']??'–'} · 3:a {rs.points_by_place?.['3']??'–'} · deltagarpoäng {rs.participation_points}</p><p><b>Minsta starter för pris:</b> {rs.min_races_for_prize} · <b>Klubbkamp:</b> {rs.club_points_use_all?'alla poäng':'endast räknade resultat'}</p></div>
+        <div className="table-scroll"><table><thead><tr><th>Klass</th><th>Poängmodell</th><th>Fast poäng</th><th>Medaljliga</th></tr></thead><tbody>{(classes??[]).map(cl=>{const rule=rulesetClassRules.find(r=>r.ruleset_id===rs.id&&r.class_id===cl.id);return <tr key={cl.id}><td><strong>{cl.name}</strong></td><td>{rule?.scoring_mode==='fixed'?'Fast':rule?.scoring_mode==='none'?'Ingen':'Standard'}</td><td>{rule?.scoring_mode==='fixed'?rule.fixed_points:'–'}</td><td>{rule?.medal_eligible===false?'Nej':'Ja'}</td></tr>})}</tbody></table></div>
+      </details>)}
     </section>}
 
     {section === 'classes' && <section className="card admin-workspace"><h2>Klassalias</h2><p className="muted">Klasserna och tidigare alias behålls. Lägg endast till alternativa namn som förekommer i importen.</p><form action={addClassAlias}>
