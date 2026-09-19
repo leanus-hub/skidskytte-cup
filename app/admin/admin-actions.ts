@@ -698,3 +698,14 @@ export async function updateRulesetClassRule(formData: FormData) {
   revalidatePath('/admin'); revalidatePath('/');
   redirect(`/admin?section=rules&ruleset=${rulesetId}&success=ruleset-updated`);
 }
+
+export async function updateFeedbackItem(formData: FormData) {
+  const supabase = await requireAdmin();
+  const id=text(formData,'id'), status=text(formData,'status'), priority=text(formData,'priority');
+  const adminNote=text(formData,'admin_note') || null, roadmapRef=text(formData,'roadmap_ref') || null;
+  if(!id || !['new','planned','in_progress','done','rejected'].includes(status) || !['low','normal','high','critical'].includes(priority))
+    redirect('/admin?section=feedback&error=feedback-fields');
+  const {error}=await supabase.from('feedback_items').update({status,priority,admin_note:adminNote,roadmap_ref:roadmapRef}).eq('id',id);
+  if(error) redirect(`/admin?section=feedback&error=${encodeURIComponent(error.message)}`);
+  revalidatePath('/admin'); redirect('/admin?section=feedback&success=feedback-updated');
+}
