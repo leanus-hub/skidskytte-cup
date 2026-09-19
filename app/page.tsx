@@ -16,6 +16,7 @@ type Standing = {
 type Breakdown = { cup_id:string; class_id:string; athlete_id:string; race_id:string; race_name:string; region_place:number; cup_points:number; shooting_hits:number|null; shooting_shots:number|null; is_counted:boolean };
 type ClassStanding = { cup_id:string; cup_name:string; season_name:string; class_id:string; class_name:string; athlete_count:number; total_points:number; total_starts:number; shooting_percentage:number|null };
 type ClubStanding = { cup_id:string; cup_name:string; season_name:string; club_id:string; club_name:string; club_place:number; athlete_count:number; total_points:number; total_starts:number; gold:number; silver:number; bronze:number; medals:number; shooting_hits:number; shooting_shots:number; shooting_percentage:number|null; medal_points:number; medal_place:number };
+type PlannedRace = { id:string; cup_id:string; name:string; race_date:string|null; sort_order:number; status:string; import_status:string; source_url:string|null; location:string|null; organizer_club_id:string|null; clubs:{name:string}|null };
 type RaceStatistic = { cup_id:string; cup_name:string; season_name:string; region_id:string; region_name:string; race_id:string; race_name:string; race_date:string|null; sort_order:number; regional_participants:number; all_participants:number; regional_clubs:number; regional_classes:number; shooting_percentage:number|null };
 
 function pct(value:number|null){ return value == null ? '–' : `${Number(value).toFixed(2)} %`; }
@@ -36,12 +37,12 @@ function medalIcons(row: ClubStanding) {
 
 export default async function HomePage({ searchParams }: { searchParams: Promise<Record<string,string|undefined>> }) {
   const params = await searchParams;
-  const view = ['individual','class','club','statistics'].includes(params.view ?? '') ? params.view! : 'individual';
+  const view = ['overview','individual','class','club','statistics'].includes(params.view ?? '') ? params.view! : 'overview';
   const clubView = params.clubView === 'medals' ? 'medals' : 'points';
   const athleteQuery = (params.q ?? '').trim();
   const normalizedAthleteQuery = athleteQuery.toLocaleLowerCase('sv-SE');
   const supabase = await createClient();
-  const [{data:regionRows,error:regionsError},{data:cupRows,error:cupsError},{data:standings,error},{data:breakdown},{data:classRows},{data:clubRows},{data:raceStats}] = await Promise.all([
+  const [{data:regionRows,error:regionsError},{data:cupRows,error:cupsError},{data:standings,error},{data:breakdown},{data:classRows},{data:clubRows},{data:raceStats},{data:plannedRaceRows}] = await Promise.all([
     supabase.from('regions').select('id,name,sort_order').order('sort_order'),
     supabase.from('cups').select('id,name,season_id,region_id').order('created_at', { ascending: false }),
     supabase.from('cup_standings').select('*').order('cup_name').order('class_name').order('cup_place'),
@@ -49,6 +50,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
     supabase.from('cup_class_standings').select('*').order('cup_name').order('class_name'),
     supabase.from('cup_club_standings').select('*').order('cup_name').order('club_place'),
     supabase.from('cup_race_statistics').select('*').order('cup_name').order('sort_order').order('race_date'),
+    supabase.from('races').select('id,cup_id,name,race_date,sort_order,status,import_status,source_url,location,organizer_club_id,clubs:organizer_club_id(name)').order('sort_order').order('race_date'),
   ]);
 
   if (regionsError || cupsError || error) {
@@ -66,6 +68,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const classes = (classRows ?? []) as ClassStanding[];
   const clubs = (clubRows ?? []) as ClubStanding[];
   const statistics = (raceStats ?? []) as RaceStatistic[];
+  const plannedRaces = (plannedRaceRows ?? []) as unknown as PlannedRace[];
   const regionWithCup = regions.find(region => cups.some(cup => cup.region_id === region.id));
   const selectedRegionId = regions.some(region => region.id === params.region)
     ? params.region!
@@ -89,6 +92,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
     />}
 
     <nav className="summary-tabs" aria-label="Sammanställning">
+      <Link className={view==='overview'?'active':''} href={href({region:selectedRegionId,cup:selectedCupId,view:'overview'})}>Översikt</Link>
       <Link className={view==='individual'?'active':''} href={href({region:selectedRegionId,cup:selectedCupId,view:'individual'})}>Individuellt</Link>
       <Link className={view==='class'?'active':''} href={href({region:selectedRegionId,cup:selectedCupId,view:'class'})}>Klasser</Link>
       <Link className={view==='club'?'active':''} href={href({region:selectedRegionId,cup:selectedCupId,view:'club',clubView})}>Klubbar</Link>
@@ -105,6 +109,9 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
       const cupId = cup.id;
       const meta = individual.find(r=>r.cup_id===cupId) ?? classes.find(r=>r.cup_id===cupId) ?? clubs.find(r=>r.cup_id===cupId) ?? statistics.find(r=>r.cup_id===cupId);
       const cupStatistics = statistics.filter(r=>r.cup_id===cupId);
+      const cupPlan = plannedRaces.filter(r=>r.cup_id===cupId).sort((a,b)=>a.sort_order-b.sort_order || String(a.race_date??'').localeCompare(String(b.race_date??'')));
+      const today = new Date().toISOString().slice(0,10);
+      const nextRace = cupPlan.find(r=>r.status!=='cancelled' && r.race_date && r.race_date>=today && r.status!=='published');
       const cupIndividuals = individual.filter(r=>r.cup_id===cupId);
       const filteredCupIndividuals = normalizedAthleteQuery
         ? cupIndividuals.filter(row => row.athlete_name.toLocaleLowerCase('sv-SE').includes(normalizedAthleteQuery))
@@ -132,6 +139,23 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           <div className="dashboard-leader"><span>Poängligan</span><strong>{pointsLeader?.club_name ?? '–'}</strong><small>{pointsLeader ? `${pointsLeader.total_points} poäng` : 'Inga resultat'}</small></div>
           <div className="dashboard-leader"><span>Medaljligan</span><strong>{medalLeader?.club_name ?? '–'}</strong><small>{medalLeader ? `${medalLeader.medal_points} medaljpoäng · ${medalLeader.gold} guld` : 'Inga resultat'}</small></div>
         </section>
+
+        {view==='overview' && <>
+          {nextRace && <section className="card next-race-card"><div><p className="eyebrow dark">Nästa deltävling</p><h3>{nextRace.name}</h3><p className="muted">{nextRace.race_date}{nextRace.location?` · ${nextRace.location}`:''}{nextRace.clubs?.name?` · ${nextRace.clubs.name}`:''}</p></div><span className="next-race-date">{nextRace.race_date?.slice(5).replace('-','/')}</span></section>}
+          <section className="card cup-calendar"><div className="calendar-heading"><div><h3>Tävlingskalender</h3><p className="muted">Cupens planerade och genomförda deltävlingar.</p></div><span className="badge">{cupPlan.length} deltävlingar</span></div>
+            {cupPlan.length===0?<p className="muted">Ingen tävlingsplan publicerad ännu.</p>:<div className="calendar-list">{cupPlan.map((race,index)=>{
+              const published=race.status==='published', cancelled=race.status==='cancelled', upcoming=!cancelled&&!published&&!!race.race_date&&race.race_date>=today;
+              const label=cancelled?'Inställd':published?'Resultat publicerade':race.import_status==='imported'?'Resultat importerade':upcoming?'Kommande':'Planerad';
+              return <article className={`calendar-race ${published?'completed':''} ${cancelled?'cancelled':''} ${nextRace?.id===race.id?'next':''}`} key={race.id}><span className="calendar-step">{published?'✓':index+1}</span><div className="calendar-race-main"><strong>{race.name}</strong><p>{race.race_date??'Datum ej satt'}{race.location?` · ${race.location}`:''}{race.clubs?.name?` · ${race.clubs.name}`:''}</p></div><span className="badge">{label}</span>{published&&<Link className="calendar-result-link" href={`/tavlingar/${race.id}`}>Visa resultat →</Link>}</article>;
+            })}</div>}
+          </section>
+          <section className="overview-shortcuts">
+            <Link href={href({region:selectedRegionId,cup:selectedCupId,view:'individual'})}><strong>Individuellt</strong><span>Ställning & åkare →</span></Link>
+            <Link href={href({region:selectedRegionId,cup:selectedCupId,view:'club',clubView:'points'})}><strong>Klubbkamp</strong><span>Poängliga →</span></Link>
+            <Link href={href({region:selectedRegionId,cup:selectedCupId,view:'club',clubView:'medals'})}><strong>Medaljliga</strong><span>Medaljer →</span></Link>
+            <Link href={href({region:selectedRegionId,cup:selectedCupId,view:'statistics'})}><strong>Statistik</strong><span>Deltävlingar & data →</span></Link>
+          </section>
+        </>}
 
         {view==='individual' && cupIndividuals.length === 0 && <div className="card empty-state"><h3>Inga publicerade individuella resultat ännu</h3><p className="muted">Cupen är korrekt kopplad till regionen, men sammanställningen innehåller ännu inga rader. Kontrollera att en tävling är importerad och publicerad.</p></div>}
         {view==='individual' && cupIndividuals.length > 0 && athleteQuery && filteredCupIndividuals.length === 0 && <div className="card empty-state"><h3>Ingen åkare hittades</h3><p className="muted">Ingen åkare i den valda cupen matchar “{athleteQuery}”. Prova ett annat namn eller rensa sökningen.</p></div>}
