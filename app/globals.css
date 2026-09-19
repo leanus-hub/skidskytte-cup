@@ -294,3 +294,30 @@ tr.outside-region td { color:var(--muted); background:#f7f8fa; }
   .athlete-race-card-stats strong { font-size:.95rem; }
   .athlete-race-card .badge { justify-self:start; }
 }
+
+.next-race-card { display:flex; align-items:center; justify-content:space-between; gap:18px; border-left:5px solid var(--accent); margin-bottom:16px; overflow:hidden; }
+.next-race-card h3 { margin:4px 0; font-size:1.45rem; }
+.next-race-card p { margin:0; }
+.next-race-date { display:grid; place-items:center; min-width:82px; min-height:70px; padding:10px; border-radius:14px; background:var(--accent-dark); color:#fff; font-size:1.25rem; font-weight:900; }
+.calendar-heading { display:flex; justify-content:space-between; align-items:flex-start; gap:15px; margin-bottom:8px; }
+.calendar-heading h3 { margin:0; }
+.calendar-heading p { margin:4px 0 0; }
+.calendar-list { display:grid; }
+.calendar-race { display:grid; grid-template-columns:36px minmax(0,1fr) auto auto; align-items:center; gap:12px; padding:13px 4px; border-top:1px solid var(--border); }
+.calendar-step { width:30px; height:30px; border-radius:50%; display:grid; place-items:center; background:#eaf1ed; color:var(--accent-dark); font-weight:900; font-size:.8rem; }
+.calendar-race.completed .calendar-step { background:var(--accent); color:#fff; }
+.calendar-race.next { background:#f3faf7; box-shadow:inset 4px 0 var(--accent); padding-left:10px; }
+.calendar-race.cancelled { opacity:.55; }
+.calendar-race-main p { margin:3px 0 0; color:var(--muted); font-size:.84rem; }
+.calendar-result-link { color:var(--accent); font-weight:800; font-size:.82rem; white-space:nowrap; }
+.overview-shortcuts { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:16px; }
+.overview-shortcuts a { display:grid; gap:5px; padding:16px; background:#fff; border:1px solid var(--border); border-radius:13px; box-shadow:0 5px 20px rgba(15,40,30,.04); }
+.overview-shortcuts a:hover { border-color:var(--accent); }
+.overview-shortcuts span { color:var(--accent); font-size:.8rem; font-weight:800; }
+@media(max-width:720px){
+ .overview-shortcuts{grid-template-columns:repeat(2,1fr)}
+ .calendar-race{grid-template-columns:34px minmax(0,1fr);gap:8px 10px}
+ .calendar-race>.badge,.calendar-result-link{grid-column:2;justify-self:start}
+ .next-race-card{align-items:flex-start}
+ .next-race-date{min-width:65px;min-height:58px;font-size:1rem}
+}
