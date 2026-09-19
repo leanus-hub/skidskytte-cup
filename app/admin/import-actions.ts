@@ -62,6 +62,9 @@ export async function importRaceResultsSafe(formData: FormData) {
   const { data: race, error: raceError } = await supabase.from('races')
     .select('id,cup_id,external_race_id,source_url').eq('id', databaseRaceId).single();
   if (raceError || !race) redirect('/admin?section=import&error=race-not-found');
+  const { data: cupState, error: cupStateError } = await supabase.from('cups').select('lifecycle_status').eq('id', race.cup_id).single();
+  if (cupStateError || !cupState) redirect('/admin?section=import&error=cup-not-found');
+  if (cupState.lifecycle_status === 'completed') redirect('/admin?section=import&error=cup-completed');
 
   const { error: processingError } = await supabase.from('races')
     .update({ import_status: 'processing', import_error: null }).eq('id', race.id);
