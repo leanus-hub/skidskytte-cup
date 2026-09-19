@@ -156,6 +156,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
               <label className="plan-source">BiathlonTiming-länk<input name="source_url" type="url" defaultValue={r.source_url??''} placeholder="https://results.biathlontiming.se/?raceId=..."/></label>
               <label className="check-row"><input type="checkbox" name="cancelled" value="true" defaultChecked={r.status==='cancelled'}/> Inställd tävling</label><button type="submit">Spara ändringar</button>
             </form></details>
+            {r.status==='draft' && r.import_status==='not_imported' && !r.source_url && !r.external_race_id && <form action={deletePlannedRace} className="delete-planned-race-form"><input type="hidden" name="race_id" value={r.id}/><input type="hidden" name="cup_id" value={params.cup}/><button type="submit" className="danger-link">Ta bort planerad tävling</button></form>}
           </article>)}
         </div>
         <CupPlanBuilder cupId={params.cup} clubs={clubs.map(c=>({id:c.id,name:c.name}))}/>
