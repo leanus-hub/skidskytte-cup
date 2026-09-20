@@ -686,6 +686,41 @@ export async function cloneRuleset(formData: FormData) {
   redirect(`/admin?section=rules&ruleset=${created.id}&success=ruleset-created`);
 }
 
+export async function updateRulesetSettings(formData: FormData) {
+  const supabase = await requireAdmin();
+  const rulesetId = text(formData, 'ruleset_id');
+  const name = text(formData, 'name');
+  const description = text(formData, 'description') || null;
+  const participationPoints = Number(text(formData, 'participation_points'));
+  const minRaces = Number(text(formData, 'min_races_for_prize'));
+  const clubPointsUseAll = text(formData, 'club_points_use_all') === 'true';
+  const medalLeagueEnabled = text(formData, 'medal_league_enabled') === 'true';
+  let pointsByPlace: Record<string,number>, dropSchedule: Record<string,number>;
+  try {
+    pointsByPlace = JSON.parse(text(formData, 'points_by_place'));
+    dropSchedule = JSON.parse(text(formData, 'drop_schedule'));
+  } catch {
+    redirect(`/admin?section=rules&ruleset=${rulesetId}&error=ruleset-json`);
+  }
+  if (!rulesetId || !name || !Number.isFinite(participationPoints) || participationPoints < 0 || !Number.isFinite(minRaces) || minRaces < 0)
+    redirect(`/admin?section=rules&ruleset=${rulesetId}&error=ruleset-fields`);
+  const { count } = await supabase.from('cups').select('id',{count:'exact',head:true})
+    .eq('ruleset_id',rulesetId).eq('lifecycle_status','completed');
+  if ((count ?? 0) > 0) redirect(`/admin?section=rules&ruleset=${rulesetId}&error=ruleset-locked`);
+  const validMap = (value: Record<string,number>) => value && typeof value === 'object' && !Array.isArray(value) &&
+    Object.entries(value).every(([key,val]) => /^\\d+$/.test(key) && Number.isFinite(Number(val)) && Number(val) >= 0);
+  if (!validMap(pointsByPlace!) || !validMap(dropSchedule!))
+    redirect(`/admin?section=rules&ruleset=${rulesetId}&error=ruleset-json`);
+  const { error } = await supabase.from('cup_rulesets').update({
+    name, description, points_by_place: pointsByPlace!, participation_points: participationPoints,
+    drop_schedule: dropSchedule!, min_races_for_prize: minRaces,
+    club_points_use_all: clubPointsUseAll, medal_league_enabled: medalLeagueEnabled,
+  }).eq('id',rulesetId);
+  if (error) redirect(`/admin?section=rules&ruleset=${rulesetId}&error=${encodeURIComponent(error.message)}`);
+  revalidatePath('/admin'); revalidatePath('/');
+  redirect(`/admin?section=rules&ruleset=${rulesetId}&success=ruleset-updated`);
+}
+
 export async function updateRulesetClassRule(formData: FormData) {
   const supabase = await requireAdmin();
   const rulesetId = text(formData, 'ruleset_id'), classId = text(formData, 'class_id');
