@@ -392,3 +392,11 @@ tr.outside-region td { color:var(--muted); background:#f7f8fa; }
  .feedback-contact{grid-template-columns:1fr}
  .feedback-form textarea{min-height:145px}
 }
+
+.ruleset-clone{margin:18px 0;padding:16px;border:1px solid var(--border);border-radius:12px;background:#f8faf9}
+.ruleset-clone h4,.ruleset-editor h4{margin:0 0 6px}
+.ruleset-clone>p{margin:0 0 12px}
+.ruleset-editor{display:grid;gap:14px;margin:18px 0;padding:18px;border-radius:12px;background:#f4f7f5}
+.ruleset-editor label{display:grid;gap:6px;font-weight:700}
+.ruleset-editor label small{color:var(--muted);font-weight:500}
+@media(max-width:650px){.ruleset-clone,.ruleset-editor{padding:14px}}
