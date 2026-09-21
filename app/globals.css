@@ -404,3 +404,13 @@ tr.outside-region td { color:var(--muted); background:#f7f8fa; }
 .insight-ties{margin-top:8px;font-size:.82rem}
 .insight-ties summary{cursor:pointer;font-weight:700}
 .insight-ties p{margin:7px 0 0;line-height:1.5;color:var(--muted)}
+
+.insight-card{display:flex;flex-direction:column;gap:7px}
+.insight-card>span{display:block}
+.insight-card>strong{display:block;line-height:1.25}
+.insight-card>small{display:block;line-height:1.4}
+.stats-summary{display:grid;grid-template-columns:repeat(4,auto 1fr);align-items:baseline;gap:6px 10px;margin:18px 0;padding:18px 22px}
+.stats-summary strong{font-size:1.35rem}
+.stats-summary span{color:var(--muted);font-size:.9rem}
+@media(max-width:800px){.stats-summary{grid-template-columns:auto 1fr auto 1fr}}
+@media(max-width:520px){.stats-summary{grid-template-columns:auto 1fr}}
