@@ -414,3 +414,14 @@ tr.outside-region td { color:var(--muted); background:#f7f8fa; }
 .stats-summary span{color:var(--muted);font-size:.9rem}
 @media(max-width:800px){.stats-summary{grid-template-columns:auto 1fr auto 1fr}}
 @media(max-width:520px){.stats-summary{grid-template-columns:auto 1fr}}
+
+.shooting-analysis{display:grid;gap:18px}
+.shooting-hero{display:flex;justify-content:space-between;align-items:center;gap:20px}
+.shooting-hero h3{font-size:2.4rem;margin:4px 0}
+.shooting-hero p{margin:0}
+.shooting-gauge{min-width:105px;text-align:center;padding:16px;border-radius:16px;background:#f4f7f5}
+.shooting-gauge strong,.shooting-gauge span{display:block}
+.shooting-gauge strong{font-size:1.6rem}
+.shooting-tabs button{border:0;background:transparent;padding:10px 14px;border-radius:999px;font:inherit;font-weight:700;cursor:pointer}
+.shooting-tabs button.active{background:#173d31;color:white}
+@media(max-width:600px){.shooting-hero{align-items:flex-start}.shooting-hero h3{font-size:2rem}.shooting-gauge{min-width:82px;padding:12px}}
