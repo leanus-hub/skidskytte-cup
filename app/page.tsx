@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import SummarySelector from './components/summary-selector';
 import AthleteSearch from './components/athlete-search';
+import ShootingAnalysis from './components/shooting-analysis';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,7 +15,7 @@ type Standing = {
   races_participated: number; races_counted: number; published_race_count: number; dropped_race_count: number;
   shooting_percentage: number | null; eligible_for_prize: boolean;
 };
-type Breakdown = { cup_id:string; class_id:string; athlete_id:string; race_id:string; race_name:string; region_place:number; cup_points:number; shooting_hits:number|null; shooting_shots:number|null; is_counted:boolean };
+type Breakdown = { cup_id:string; class_id:string; class_name:string; athlete_id:string; athlete_name:string; club_id:string; club_name:string; race_id:string; race_name:string; sort_order:number; region_place:number; cup_points:number; shooting_hits:number|null; shooting_shots:number|null; is_counted:boolean };
 type ClassStanding = { cup_id:string; cup_name:string; season_name:string; class_id:string; class_name:string; athlete_count:number; total_points:number; total_starts:number; shooting_percentage:number|null };
 type ClubStanding = { cup_id:string; cup_name:string; season_name:string; club_id:string; club_name:string; club_place:number; athlete_count:number; total_points:number; total_starts:number; gold:number; silver:number; bronze:number; medals:number; shooting_hits:number; shooting_shots:number; shooting_percentage:number|null; medal_points:number; medal_place:number };
 type PlannedRace = { id:string; cup_id:string; name:string; race_date:string|null; sort_order:number; status:string; import_status:string; source_url:string|null; location:string|null; organizer_club_id:string|null; clubs:{name:string}|null };
@@ -38,7 +39,7 @@ function medalIcons(row: ClubStanding) {
 
 export default async function HomePage({ searchParams }: { searchParams: Promise<Record<string,string|undefined>> }) {
   const params = await searchParams;
-  const view = ['overview','individual','class','club','statistics'].includes(params.view ?? '') ? params.view! : 'overview';
+  const view = ['overview','individual','class','club','statistics','shooting'].includes(params.view ?? '') ? params.view! : 'overview';
   const clubView = params.clubView === 'medals' ? 'medals' : 'points';
   const athleteQuery = (params.q ?? '').trim();
   const normalizedAthleteQuery = athleteQuery.toLocaleLowerCase('sv-SE');
@@ -48,7 +49,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
     supabase.from('cups').select('id,name,season_id,region_id').order('created_at', { ascending: false }),
     supabase.from('classes').select('id,name,sort_order').order('sort_order'),
     supabase.from('cup_standings').select('*').order('cup_name').order('class_name').order('cup_place'),
-    supabase.from('cup_result_breakdown').select('cup_id,class_id,athlete_id,race_id,race_name,region_place,cup_points,shooting_hits,shooting_shots,is_counted').order('race_date').order('sort_order'),
+    supabase.from('cup_result_breakdown').select('cup_id,class_id,class_name,athlete_id,athlete_name,club_id,club_name,race_id,race_name,sort_order,region_place,cup_points,shooting_hits,shooting_shots,is_counted').order('race_date').order('sort_order'),
     supabase.from('cup_class_standings').select('*').order('cup_name').order('class_name'),
     supabase.from('cup_club_standings').select('*').order('cup_name').order('club_place'),
     supabase.from('cup_race_statistics').select('*').order('cup_name').order('sort_order').order('race_date'),
@@ -101,6 +102,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
       <Link className={view==='class'?'active':''} href={href({region:selectedRegionId,cup:selectedCupId,view:'class'})}>Klasser</Link>
       <Link className={view==='club'?'active':''} href={href({region:selectedRegionId,cup:selectedCupId,view:'club',clubView})}>Klubbar</Link>
       <Link className={view==='statistics'?'active':''} href={href({region:selectedRegionId,cup:selectedCupId,view:'statistics'})}>Cupstatistik</Link>
+      <Link className={view==='shooting'?'active':''} href={href({region:selectedRegionId,cup:selectedCupId,view:'shooting'})}>Skytteanalys</Link>
     </nav>
 
     {view==='individual' && <AthleteSearch initialValue={athleteQuery} />}
@@ -180,6 +182,8 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         {view==='individual' && cupIndividuals.length > 0 && athleteQuery && filteredCupIndividuals.length === 0 && <div className="card empty-state"><h3>Ingen åkare hittades</h3><p className="muted">Ingen åkare i den valda cupen matchar “{athleteQuery}”. Prova ett annat namn eller rensa sökningen.</p></div>}
         {view==='class' && cupClasses.length === 0 && <div className="card empty-state"><h3>Ingen klassammanställning ännu</h3><p className="muted">Publicera minst en importerad deltävling för cupen.</p></div>}
         {view==='club' && cupClubs.length === 0 && <div className="card empty-state"><h3>Ingen klubbsammanställning ännu</h3><p className="muted">Klubbpoäng visas när publicerade resultat finns.</p></div>}
+
+        {view==='shooting' && <ShootingAnalysis rows={details.filter(d=>d.cup_id===cupId)} />}
         {view==='statistics' && cupStatistics.length === 0 && <div className="card empty-state"><h3>Ingen cupstatistik ännu</h3><p className="muted">Statistik visas när cupens deltävlingar har importerats och publicerats.</p></div>}
 
         {view==='individual' && Array.from(new Set(filteredCupIndividuals.map(r=>r.class_name))).sort((a,b)=>{
