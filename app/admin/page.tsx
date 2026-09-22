@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
-import { addClassAlias, createCup, createSeason, deletePlannedRace, inviteAdmin, logout, setAdminRole, setRaceStatus, updatePlannedRace, movePlannedRace, updateCupSettings, cloneRuleset, updateRulesetSettings, updateRulesetClassRule, updateFeedbackItem, mergeAthletes } from './admin-actions';
+import { addClassAlias, createCup, createSeason, deletePlannedRace, inviteAdmin, logout, setAdminRole, setRaceStatus, updatePlannedRace, movePlannedRace, updateCupSettings, cloneRuleset, updateRulesetSettings, updateRulesetClassRule, updateFeedbackItem, mergeAthletes, createShootingGroup, deleteShootingGroup } from './admin-actions';
 import { importRaceResultsSafe } from './import-actions';
 import ClubManager from './club-manager';
 import CupPlanBuilder from './cup-plan-builder';
@@ -35,14 +35,20 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
 
   let athletesAdmin: {id:string;full_name:string;club_id:string|null;birth_year:number|null;aliases:string[]|null;merged_into_id:string|null;results?:{count:number}[]}[] = [];
   let athleteResultRows: {athlete_id:string;race_id:string;class_id:string}[] = [];
+  let shootingGroupsAdmin: {id:string;name:string;description:string|null;active:boolean}[]=[];
+  let shootingGroupMembersAdmin: {group_id:string;athlete_id:string}[]=[];
   if (section === 'athletes') {
-    const [{data:a,error:ae},{data:rr,error:re}] = await Promise.all([
+    const [{data:a,error:ae},{data:rr,error:re},{data:sg,error:sge},{data:sgm,error:sgme}] = await Promise.all([
       supabase.from('athletes').select('id,full_name,club_id,birth_year,aliases,merged_into_id').order('full_name'),
       supabase.from('results').select('athlete_id,race_id,class_id'),
+      supabase.from('shooting_analysis_groups').select('id,name,description,active').order('name'),
+      supabase.from('shooting_analysis_group_members').select('group_id,athlete_id'),
     ]);
     if(ae) throw new Error(`Kunde inte läsa åkare: ${ae.message}`);
     if(re) throw new Error(`Kunde inte läsa åkarresultat: ${re.message}`);
-    athletesAdmin=a??[]; athleteResultRows=rr??[];
+    if(sge) throw new Error(`Kunde inte läsa analysgrupper: ${sge.message}`);
+    if(sgme) throw new Error(`Kunde inte läsa gruppmedlemmar: ${sgme.message}`);
+    athletesAdmin=a??[]; athleteResultRows=rr??[]; shootingGroupsAdmin=sg??[]; shootingGroupMembersAdmin=sgm??[];
   }
 
   let feedbackItems: {id:string;created_at:string;type:string;status:string;priority:string;message:string;name:string|null;email:string|null;page_url:string|null;admin_note:string|null;roadmap_ref:string|null}[] = [];
@@ -221,6 +227,11 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     />}
 
     {section === 'athletes' && <section className="card admin-workspace"><h2>Åkare & identitet</h2><p className="muted">Åkaridentiteten är fristående från klass och kan behållas över flera säsonger. Slå bara ihop poster när du är säker på att de avser samma person.</p>
+      <section className="analysis-group-admin"><div className="calendar-heading"><div><h3>Analysgrupper</h3><p className="muted">Skapa en fast grupp av åkare för att följa skytteutvecklingen över cuper och säsonger.</p></div><span className="badge">{shootingGroupsAdmin.length}</span></div>
+        <form action={createShootingGroup} className="card group-create-form"><label>Gruppnamn<input name="name" required maxLength={80} placeholder="Ex. Borås 12–15 år"/></label><label>Beskrivning<input name="description" maxLength={200} placeholder="Valfri beskrivning"/></label><fieldset><legend>Välj åkare</legend><div className="group-athlete-picker">{athletesAdmin.filter(a=>!a.merged_into_id).map(a=><label className="check-row" key={a.id}><input type="checkbox" name="athlete_ids" value={a.id}/>{a.full_name}</label>)}</div></fieldset><button type="submit">Skapa analysgrupp</button></form>
+        {shootingGroupsAdmin.map(g=>{const ids=shootingGroupMembersAdmin.filter(m=>m.group_id===g.id).map(m=>m.athlete_id);return <article className="card analysis-group-row" key={g.id}><div><strong>{g.name}</strong><p className="muted">{g.description||'Ingen beskrivning'} · {ids.length} åkare</p><small>{ids.map(id=>athletesAdmin.find(a=>a.id===id)?.full_name).filter(Boolean).join(' · ')}</small></div><form action={deleteShootingGroup}><input type="hidden" name="group_id" value={g.id}/><button type="submit" className="secondary-dark">Ta bort</button></form></article>})}
+      </section>
+      <h3>Åkaridentiteter</h3>
       <div className="athlete-admin-list">{athletesAdmin.filter(a=>!a.merged_into_id).map(a=>{const starts=new Set(athleteResultRows.filter(r=>r.athlete_id===a.id).map(r=>r.race_id)).size;const sameName=athletesAdmin.filter(b=>b.id!==a.id&&!b.merged_into_id&&b.full_name.toLocaleLowerCase('sv-SE')===a.full_name.toLocaleLowerCase('sv-SE'));return <details className="card cup-settings-card" key={a.id} open={params.athlete===a.id}><summary><span><strong>{a.full_name}</strong><small>{starts} starter{a.birth_year?` · född ${a.birth_year}`:''}</small></span>{sameName.length>0&&<span className="badge admin-attention">Möjlig dubblett</span>}</summary>
         {a.aliases?.length?<p><b>Alias:</b> {a.aliases.join(', ')}</p>:null}
         <form action={mergeAthletes}><input type="hidden" name="keep_id" value={a.id}/><label>Slå ihop med<select name="merge_id" required defaultValue=""><option value="" disabled>Välj annan åkare</option>{athletesAdmin.filter(b=>b.id!==a.id&&!b.merged_into_id).map(b=><option key={b.id} value={b.id}>{b.full_name}</option>)}</select><small>Resultaten flyttas till {a.full_name}. Sammanslagningen stoppas automatiskt om båda har resultat i samma tävling och klass.</small></label><button className="secondary-dark">Slå ihop åkare</button></form>
