@@ -774,3 +774,21 @@ export async function mergeAthletes(formData: FormData) {
   revalidatePath('/'); revalidatePath('/admin');
   redirect(`/admin?section=athletes&athlete=${keepId}&success=athletes-merged`);
 }
+
+
+export async function createShootingGroup(formData: FormData) {
+  const supabase=await requireAdmin(); const name=text(formData,'name'), description=text(formData,'description')||null;
+  const athleteIds=formData.getAll('athlete_ids').map(String).filter(Boolean);
+  if(!name || athleteIds.length===0) redirect('/admin?section=athletes&error=group-fields');
+  const {data:g,error}=await supabase.from('shooting_analysis_groups').insert({name,description}).select('id').single();
+  if(error||!g) redirect(`/admin?section=athletes&error=${encodeURIComponent(error?.message??'group-create')}`);
+  const {error:me}=await supabase.from('shooting_analysis_group_members').insert(athleteIds.map(athlete_id=>({group_id:g.id,athlete_id})));
+  if(me) redirect(`/admin?section=athletes&error=${encodeURIComponent(me.message)}`);
+  revalidatePath('/'); revalidatePath('/admin'); redirect('/admin?section=athletes&success=group-created');
+}
+export async function deleteShootingGroup(formData: FormData) {
+ const supabase=await requireAdmin(); const id=text(formData,'group_id'); if(!id) redirect('/admin?section=athletes&error=group-fields');
+ const {error}=await supabase.from('shooting_analysis_groups').delete().eq('id',id);
+ if(error) redirect(`/admin?section=athletes&error=${encodeURIComponent(error.message)}`);
+ revalidatePath('/'); revalidatePath('/admin'); redirect('/admin?section=athletes&success=group-deleted');
+}
