@@ -155,7 +155,7 @@ export async function importRaceResultsSafe(formData: FormData) {
       }
 
       const { error } = await supabase.from('results').upsert({
-        race_id: race.id, class_id: item.classId, athlete_id: athleteId,
+        race_id: race.id, class_id: item.classId, athlete_id: athleteId, club_id: item.clubId,
         bib: item.row.bib, place: item.row.place, status: item.row.status,
         total_time_ms: item.row.totalTimeMs, shooting: item.row.shooting,
         shooting_hits: item.row.shootingHits, shooting_shots: item.row.shootingShots,
