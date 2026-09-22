@@ -437,3 +437,10 @@ tr.outside-region td { color:var(--muted); background:#f7f8fa; }
 .rules-points-grid input,.rules-drop-grid input{min-width:0}
 @media(max-width:800px){.rules-summary-grid{grid-template-columns:repeat(2,1fr)}.rules-points-grid,.rules-drop-grid{grid-template-columns:repeat(4,1fr)}}
 @media(max-width:520px){.rules-points-grid,.rules-drop-grid{grid-template-columns:repeat(3,1fr)}}
+
+/* Shooting analysis tabs follow the same light outlined language as the rest of the site. */
+.shooting-tabs{gap:.5rem}
+.shooting-tabs button{background:#fff;color:var(--text);border:1px solid var(--border);padding:.7rem 1rem;border-radius:999px;font:inherit;font-weight:800;cursor:pointer}
+.shooting-tabs button.active{background:var(--accent-bg,#eef3f1);color:var(--accent-dark);border-color:var(--accent-dark);box-shadow:inset 0 0 0 1px var(--accent-dark)}
+.shooting-tabs button:hover{border-color:var(--accent-dark)}
+.shooting-tabs button:focus-visible{outline:3px solid var(--accent-bg,#eef3f1);outline-offset:2px}
