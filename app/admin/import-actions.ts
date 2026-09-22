@@ -82,7 +82,7 @@ export async function importRaceResultsSafe(formData: FormData) {
     const [{ data: clubs, error: clubsError }, { data: classes, error: classesError }, { data: athletes, error: athletesError }, { data: oldResults, error: oldResultsError }] = await Promise.all([
       supabase.from('clubs').select('id,name,short_name,aliases,region_id'),
       supabase.from('classes').select('id,name,aliases').eq('is_official', true),
-      supabase.from('athletes').select('id,full_name,club_id'),
+      supabase.from('athletes').select('id,full_name,club_id,aliases,merged_into_id').is('merged_into_id', null),
       supabase.from('results').select('class_id,athlete_id').eq('race_id', race.id),
     ]);
     if (clubsError) throw clubsError;
@@ -95,7 +95,13 @@ export async function importRaceResultsSafe(formData: FormData) {
     const classMap = new Map<string, (typeof classes)[number] | null>();
     for (const cls of classes ?? []) for (const alias of [cls.name, ...(cls.aliases ?? [])]) if (alias) addUnique(classMap, normalizeClassName(alias), cls);
     const athleteMap = new Map<string, (typeof athletes)[number] | null>();
-    for (const athlete of athletes ?? []) addUnique(athleteMap, `${normalizeName(athlete.full_name)}|${athlete.club_id}`, athlete);
+    const athleteNameMap = new Map<string, (typeof athletes)[number] | null>();
+    for (const athlete of athletes ?? []) {
+      for (const name of [athlete.full_name,...(athlete.aliases??[])]) {
+        addUnique(athleteMap, `${normalizeName(name)}|${athlete.club_id}`, athlete);
+        addUnique(athleteNameMap, normalizeName(name), athlete);
+      }
+    }
 
     // PRE-FLIGHT: resolve and validate every source row before creating athletes or writing results.
     const plan: PlannedResult[] = [];
@@ -112,8 +118,15 @@ export async function importRaceResultsSafe(formData: FormData) {
       if (club.region_id !== cup.region_id) outsideCount += 1;
 
       const athleteKey = `${normalizeName(row.athleteName)}|${club.id}`;
-      const athlete = athleteMap.get(athleteKey);
+      let athlete = athleteMap.get(athleteKey);
       if (athlete === null) throw new Error(`Tvetydig åkare: ${row.athleteName} i ${club.name}. Flera befintliga åkare matchar.`);
+      // Identity is not owned by the current club. If the exact/alias name identifies one
+      // existing athlete globally, reuse that identity even after a club change.
+      if (!athlete) {
+        const globalMatch=athleteNameMap.get(normalizeName(row.athleteName));
+        if (globalMatch === null) throw new Error(`Osäker åkaridentitet: ${row.athleteName}. Flera befintliga åkare har samma namn. Granska under Admin → Åkare.`);
+        if (globalMatch) athlete=globalMatch;
+      }
 
       const sourceKey = `${cls.id}|${athleteKey}`;
       if (sourceKeys.has(sourceKey)) throw new Error(`Dubblett i källresultatet: ${row.athleteName}, ${row.className}, ${club.name}. Ingen data har skrivits.`);
