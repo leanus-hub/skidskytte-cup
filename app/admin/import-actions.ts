@@ -118,14 +118,16 @@ export async function importRaceResultsSafe(formData: FormData) {
       if (club.region_id !== cup.region_id) outsideCount += 1;
 
       const athleteKey = `${normalizeName(row.athleteName)}|${club.id}`;
-      let athlete = athleteMap.get(athleteKey);
+      const athlete = athleteMap.get(athleteKey);
       if (athlete === null) throw new Error(`Tvetydig åkare: ${row.athleteName} i ${club.name}. Flera befintliga åkare matchar.`);
-      // Identity is not owned by the current club. If the exact/alias name identifies one
-      // existing athlete globally, reuse that identity even after a club change.
+
+      // A name alone is not a safe identity key across clubs. The same person may have
+      // changed club, but a different person can also have the same name. Never merge
+      // those cases automatically: stop before writing and let Admin → Åkare resolve it.
       if (!athlete) {
-        const globalMatch=athleteNameMap.get(normalizeName(row.athleteName));
+        const globalMatch = athleteNameMap.get(normalizeName(row.athleteName));
         if (globalMatch === null) throw new Error(`Osäker åkaridentitet: ${row.athleteName}. Flera befintliga åkare har samma namn. Granska under Admin → Åkare.`);
-        if (globalMatch) athlete=globalMatch;
+        if (globalMatch) throw new Error(`Möjligt klubbbyte eller namnkrock: ${row.athleteName} finns redan registrerad i en annan klubb. Importen stoppades utan ändringar. Granska under Admin → Åkare innan import.`);
       }
 
       const sourceKey = `${cls.id}|${athleteKey}`;
