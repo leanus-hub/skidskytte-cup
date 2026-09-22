@@ -763,3 +763,14 @@ export async function updateFeedbackItem(formData: FormData) {
   if(error) redirect(`/admin?section=feedback&error=${encodeURIComponent(error.message)}`);
   revalidatePath('/admin'); redirect('/admin?section=feedback&success=feedback-updated');
 }
+
+
+export async function mergeAthletes(formData: FormData) {
+  const supabase = await requireAdmin();
+  const keepId=text(formData,'keep_id'), mergeId=text(formData,'merge_id');
+  if(!keepId || !mergeId || keepId===mergeId) redirect('/admin?section=athletes&error=athlete-merge-fields');
+  const {error}=await supabase.rpc('merge_athletes',{p_keep:keepId,p_merge:mergeId});
+  if(error) redirect(`/admin?section=athletes&error=${encodeURIComponent(error.message)}`);
+  revalidatePath('/'); revalidatePath('/admin');
+  redirect(`/admin?section=athletes&athlete=${keepId}&success=athletes-merged`);
+}
