@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
-import { addClassAlias, createCup, createSeason, deletePlannedRace, inviteAdmin, logout, setAdminRole, setRaceStatus, updatePlannedRace, movePlannedRace, updateCupSettings, cloneRuleset, updateRulesetSettings, updateRulesetClassRule, updateFeedbackItem } from './admin-actions';
+import { addClassAlias, createCup, createSeason, deletePlannedRace, inviteAdmin, logout, setAdminRole, setRaceStatus, updatePlannedRace, movePlannedRace, updateCupSettings, cloneRuleset, updateRulesetSettings, updateRulesetClassRule, updateFeedbackItem, mergeAthletes } from './admin-actions';
 import { importRaceResultsSafe } from './import-actions';
 import ClubManager from './club-manager';
 import CupPlanBuilder from './cup-plan-builder';
@@ -17,7 +17,7 @@ function adminHref(section: string, params: Record<string,string|undefined> = {}
 
 export default async function AdminPage({ searchParams }: { searchParams: Promise<Params> }) {
   const params = await searchParams;
-  const section = ['season','cup','rules','plan','import','feedback','classes','clubs','admins'].includes(params.section ?? '') ? params.section! : 'home';
+  const section = ['season','cup','rules','plan','import','feedback','classes','clubs','athletes','admins'].includes(params.section ?? '') ? params.section! : 'home';
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect('/admin/login');
@@ -32,6 +32,18 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     supabase.from('regions').select('id,name').order('sort_order'),
     supabase.from('cup_rulesets').select('id,name,description,points_by_place,participation_points,drop_schedule,min_races_for_prize,club_points_use_all,club_min_races_per_athlete,medal_league_enabled').eq('active',true).order('name'),
   ]);
+
+  let athletesAdmin: {id:string;full_name:string;club_id:string|null;birth_year:number|null;aliases:string[]|null;merged_into_id:string|null;results?:{count:number}[]}[] = [];
+  let athleteResultRows: {athlete_id:string;race_id:string;class_id:string}[] = [];
+  if (section === 'athletes') {
+    const [{data:a,error:ae},{data:rr,error:re}] = await Promise.all([
+      supabase.from('athletes').select('id,full_name,club_id,birth_year,aliases,merged_into_id').order('full_name'),
+      supabase.from('results').select('athlete_id,race_id,class_id'),
+    ]);
+    if(ae) throw new Error(`Kunde inte läsa åkare: ${ae.message}`);
+    if(re) throw new Error(`Kunde inte läsa åkarresultat: ${re.message}`);
+    athletesAdmin=a??[]; athleteResultRows=rr??[];
+  }
 
   let feedbackItems: {id:string;created_at:string;type:string;status:string;priority:string;message:string;name:string|null;email:string|null;page_url:string|null;admin_note:string|null;roadmap_ref:string|null}[] = [];
   if (section === 'feedback') {
@@ -98,7 +110,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
 
   const nav = [
     ['home','Översikt'], ['season','Ny säsong'], ['cup','Ny cup'], ['rules','Regelverk'], ['plan','Tävlingsplan'],
-    ['import','Resultatflöde'], ['feedback','Ärenden'], ['classes','Klassalias'], ['clubs','Regioner & föreningar'], ['admins','Administratörer'],
+    ['import','Resultatflöde'], ['feedback','Ärenden'], ['classes','Klassalias'], ['clubs','Regioner & föreningar'], ['athletes','Åkare'], ['admins','Administratörer'],
   ];
 
   return <>
@@ -207,6 +219,13 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       initialRegionId={selectedRegionId}
       initialClubId={params.club}
     />}
+
+    {section === 'athletes' && <section className="card admin-workspace"><h2>Åkare & identitet</h2><p className="muted">Åkaridentiteten är fristående från klass och kan behållas över flera säsonger. Slå bara ihop poster när du är säker på att de avser samma person.</p>
+      <div className="athlete-admin-list">{athletesAdmin.filter(a=>!a.merged_into_id).map(a=>{const starts=new Set(athleteResultRows.filter(r=>r.athlete_id===a.id).map(r=>r.race_id)).size;const sameName=athletesAdmin.filter(b=>b.id!==a.id&&!b.merged_into_id&&b.full_name.toLocaleLowerCase('sv-SE')===a.full_name.toLocaleLowerCase('sv-SE'));return <details className="card cup-settings-card" key={a.id} open={params.athlete===a.id}><summary><span><strong>{a.full_name}</strong><small>{starts} starter{a.birth_year?` · född ${a.birth_year}`:''}</small></span>{sameName.length>0&&<span className="badge admin-attention">Möjlig dubblett</span>}</summary>
+        {a.aliases?.length?<p><b>Alias:</b> {a.aliases.join(', ')}</p>:null}
+        <form action={mergeAthletes}><input type="hidden" name="keep_id" value={a.id}/><label>Slå ihop med<select name="merge_id" required defaultValue=""><option value="" disabled>Välj annan åkare</option>{athletesAdmin.filter(b=>b.id!==a.id&&!b.merged_into_id).map(b=><option key={b.id} value={b.id}>{b.full_name}</option>)}</select><small>Resultaten flyttas till {a.full_name}. Sammanslagningen stoppas automatiskt om båda har resultat i samma tävling och klass.</small></label><button className="secondary-dark">Slå ihop åkare</button></form>
+      </details>})}</div>
+    </section>}
 
     {section === 'admins' && <section className="card admin-workspace">
       <h2>Administratörer</h2>
