@@ -425,3 +425,15 @@ tr.outside-region td { color:var(--muted); background:#f7f8fa; }
 .shooting-tabs button{border:0;background:transparent;padding:10px 14px;border-radius:999px;font:inherit;font-weight:700;cursor:pointer}
 .shooting-tabs button.active{background:#173d31;color:white}
 @media(max-width:600px){.shooting-hero{align-items:flex-start}.shooting-hero h3{font-size:2rem}.shooting-gauge{min-width:82px;padding:12px}}
+
+.rules-summary-grid{display:grid;grid-template-columns:repeat(5,minmax(110px,1fr));gap:10px;margin:12px 0 16px}
+.rules-summary-grid span{display:flex;flex-direction:column;gap:3px;padding:12px 14px;border-radius:12px;background:var(--surface-soft,#f4f7f5)}
+.rules-summary-grid b{font-size:1.05rem}.rules-summary-grid small{color:var(--muted)}
+.rules-grid-fieldset{border:1px solid var(--border);border-radius:14px;padding:16px;margin:18px 0}
+.rules-grid-fieldset legend{font-weight:800;padding:0 7px}
+.rules-points-grid,.rules-drop-grid{display:grid;grid-template-columns:repeat(7,minmax(76px,1fr));gap:9px}
+.rules-points-grid label,.rules-drop-grid label{display:flex;flex-direction:column;gap:4px;margin:0}
+.rules-points-grid span,.rules-drop-grid span{font-size:.78rem;color:var(--muted);font-weight:700}
+.rules-points-grid input,.rules-drop-grid input{min-width:0}
+@media(max-width:800px){.rules-summary-grid{grid-template-columns:repeat(2,1fr)}.rules-points-grid,.rules-drop-grid{grid-template-columns:repeat(4,1fr)}}
+@media(max-width:520px){.rules-points-grid,.rules-drop-grid{grid-template-columns:repeat(3,1fr)}}
