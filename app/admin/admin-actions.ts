@@ -696,25 +696,32 @@ export async function updateRulesetSettings(formData: FormData) {
   const clubPointsUseAll = text(formData, 'club_points_use_all') === 'true';
   const clubMinRaces = Number(text(formData, 'club_min_races_per_athlete') || '0');
   const medalLeagueEnabled = text(formData, 'medal_league_enabled') === 'true';
-  let pointsByPlace: Record<string,number>, dropSchedule: Record<string,number>;
-  try {
-    pointsByPlace = JSON.parse(text(formData, 'points_by_place'));
-    dropSchedule = JSON.parse(text(formData, 'drop_schedule'));
-  } catch {
-    redirect(`/admin?section=rules&ruleset=${rulesetId}&error=ruleset-json`);
+  const pointsByPlace: Record<string,number> = {};
+  const dropSchedule: Record<string,number> = {};
+  for (let place=1; place<=20; place++) {
+    const raw=text(formData,`points_place_${place}`);
+    if (raw !== '') {
+      const value=Number(raw);
+      if (!Number.isFinite(value) || value < 0) redirect(`/admin?section=rules&ruleset=${rulesetId}&error=ruleset-fields`);
+      pointsByPlace[String(place)]=value;
+    }
   }
-  if (!rulesetId || !name || !Number.isFinite(participationPoints) || participationPoints < 0 || !Number.isFinite(minRaces) || minRaces < 0 || !Number.isInteger(clubMinRaces) || clubMinRaces < 0)
+  for (let races=0; races<=15; races++) {
+    const raw=text(formData,`drop_races_${races}`);
+    if (raw !== '') {
+      const value=Number(raw);
+      if (!Number.isInteger(value) || value < 0 || value > races) redirect(`/admin?section=rules&ruleset=${rulesetId}&error=ruleset-fields`);
+      dropSchedule[String(races)]=value;
+    }
+  }
+  if (!rulesetId || !name || !Number.isFinite(participationPoints) || participationPoints < 0 || !Number.isFinite(minRaces) || minRaces < 0 || !Number.isInteger(clubMinRaces) || clubMinRaces < 0 || !Object.keys(pointsByPlace).length || !Object.keys(dropSchedule).length)
     redirect(`/admin?section=rules&ruleset=${rulesetId}&error=ruleset-fields`);
   const { count } = await supabase.from('cups').select('id',{count:'exact',head:true})
     .eq('ruleset_id',rulesetId).eq('lifecycle_status','completed');
   if ((count ?? 0) > 0) redirect(`/admin?section=rules&ruleset=${rulesetId}&error=ruleset-locked`);
-  const validMap = (value: Record<string,number>) => value && typeof value === 'object' && !Array.isArray(value) &&
-    Object.entries(value).every(([key,val]) => /^\\d+$/.test(key) && Number.isFinite(Number(val)) && Number(val) >= 0);
-  if (!validMap(pointsByPlace!) || !validMap(dropSchedule!))
-    redirect(`/admin?section=rules&ruleset=${rulesetId}&error=ruleset-json`);
   const { error } = await supabase.from('cup_rulesets').update({
-    name, description, points_by_place: pointsByPlace!, participation_points: participationPoints,
-    drop_schedule: dropSchedule!, min_races_for_prize: minRaces,
+    name, description, points_by_place: pointsByPlace, participation_points: participationPoints,
+    drop_schedule: dropSchedule, min_races_for_prize: minRaces,
     club_points_use_all: clubPointsUseAll, club_min_races_per_athlete: clubMinRaces, medal_league_enabled: medalLeagueEnabled,
   }).eq('id',rulesetId);
   if (error) redirect(`/admin?section=rules&ruleset=${rulesetId}&error=${encodeURIComponent(error.message)}`);
