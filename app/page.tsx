@@ -44,7 +44,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const athleteQuery = (params.q ?? '').trim();
   const normalizedAthleteQuery = athleteQuery.toLocaleLowerCase('sv-SE');
   const supabase = await createClient();
-  const [{data:regionRows,error:regionsError},{data:cupRows,error:cupsError},{data:competitionClassRows},{data:standings,error},{data:breakdown},{data:classRows},{data:clubRows},{data:raceStats},{data:plannedRaceRows}] = await Promise.all([
+  const [{data:regionRows,error:regionsError},{data:cupRows,error:cupsError},{data:competitionClassRows},{data:standings,error},{data:breakdown},{data:classRows},{data:clubRows},{data:raceStats},{data:plannedRaceRows},{data:shootingGroups},{data:shootingGroupMembers}] = await Promise.all([
     supabase.from('regions').select('id,name,sort_order').order('sort_order'),
     supabase.from('cups').select('id,name,season_id,region_id').order('created_at', { ascending: false }),
     supabase.from('classes').select('id,name,sort_order').order('sort_order'),
@@ -54,6 +54,8 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
     supabase.from('cup_club_standings').select('*').order('cup_name').order('club_place'),
     supabase.from('cup_race_statistics').select('*').order('cup_name').order('sort_order').order('race_date'),
     supabase.from('races').select('id,cup_id,name,race_date,sort_order,status,import_status,source_url,location,organizer_club_id,clubs:organizer_club_id(name)').order('sort_order').order('race_date'),
+    supabase.from('shooting_analysis_groups').select('id,name,description').eq('active',true).order('name'),
+    supabase.from('shooting_analysis_group_members').select('group_id,athlete_id'),
   ]);
 
   if (regionsError || cupsError || error) {
@@ -183,7 +185,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         {view==='class' && cupClasses.length === 0 && <div className="card empty-state"><h3>Ingen klassammanställning ännu</h3><p className="muted">Publicera minst en importerad deltävling för cupen.</p></div>}
         {view==='club' && cupClubs.length === 0 && <div className="card empty-state"><h3>Ingen klubbsammanställning ännu</h3><p className="muted">Klubbpoäng visas när publicerade resultat finns.</p></div>}
 
-        {view==='shooting' && <ShootingAnalysis rows={details.filter(d=>d.cup_id===cupId)} />}
+        {view==='shooting' && <ShootingAnalysis rows={details.filter(d=>d.cup_id===cupId)} groups={(shootingGroups??[]).map(g=>({...g,athlete_ids:(shootingGroupMembers??[]).filter(m=>m.group_id===g.id).map(m=>m.athlete_id)}))} />}
         {view==='statistics' && cupStatistics.length === 0 && <div className="card empty-state"><h3>Ingen cupstatistik ännu</h3><p className="muted">Statistik visas när cupens deltävlingar har importerats och publicerats.</p></div>}
 
         {view==='individual' && Array.from(new Set(filteredCupIndividuals.map(r=>r.class_name))).sort((a,b)=>{
