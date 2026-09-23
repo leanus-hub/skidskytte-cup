@@ -81,3 +81,31 @@ export async function approveExternalPreview(formData:FormData){
  if(error) redirect(`/admin?section=external&batch=${id}&error=${encodeURIComponent(error.message)}`);
  redirect(`/admin?section=external&batch=${id}&success=preview-approved`);
 }
+
+
+export async function resolveExternalAthlete(formData:FormData){
+ const {supabase}=await admin();
+ const rowId=text(formData,'row_id'), importId=text(formData,'import_id'), athleteId=text(formData,'athlete_id');
+ if(!rowId||!importId||!athleteId) redirect('/admin?section=external&error=resolution-fields');
+ const {data:athlete,error:ae}=await supabase.from('athletes').select('id,full_name').eq('id',athleteId).is('merged_into_id',null).single();
+ if(ae||!athlete) redirect(`/admin?section=external&batch=${importId}&error=athlete-not-found`);
+ const {error}=await supabase.from('external_result_rows').update({matched_athlete_id:athlete.id,match_status:'matched',match_note:`Manuellt kopplad till ${athlete.full_name}.`}).eq('id',rowId).eq('import_id',importId);
+ if(error) redirect(`/admin?section=external&batch=${importId}&error=${encodeURIComponent(error.message)}`);
+ const {data:remaining}=await supabase.from('external_result_rows').select('id').eq('import_id',importId).in('match_status',['ambiguous','unmatched']).limit(1);
+ if(!remaining?.length) await supabase.from('external_result_imports').update({status:'preview'}).eq('id',importId).eq('status','needs_review');
+ redirect(`/admin?section=external&batch=${importId}&success=athlete-resolved`);
+}
+
+export async function confirmExternalNewAthlete(formData:FormData){
+ const {supabase}=await admin();
+ const rowId=text(formData,'row_id'), importId=text(formData,'import_id');
+ if(!rowId||!importId) redirect('/admin?section=external&error=resolution-fields');
+ const {data:row,error:re}=await supabase.from('external_result_rows').select('athlete_name,match_status').eq('id',rowId).eq('import_id',importId).single();
+ if(re||!row) redirect(`/admin?section=external&batch=${importId}&error=row-not-found`);
+ if(!['new','ambiguous','unmatched'].includes(row.match_status)) redirect(`/admin?section=external&batch=${importId}&error=row-already-resolved`);
+ const {error}=await supabase.from('external_result_rows').update({matched_athlete_id:null,match_status:'new',match_note:'Manuellt bekräftad som ny extern åkaridentitet. Ingen åkare skapas i cupregistret.'}).eq('id',rowId).eq('import_id',importId);
+ if(error) redirect(`/admin?section=external&batch=${importId}&error=${encodeURIComponent(error.message)}`);
+ const {data:remaining}=await supabase.from('external_result_rows').select('id').eq('import_id',importId).in('match_status',['ambiguous','unmatched']).limit(1);
+ if(!remaining?.length) await supabase.from('external_result_imports').update({status:'preview'}).eq('id',importId).eq('status','needs_review');
+ redirect(`/admin?section=external&batch=${importId}&success=athlete-resolved`);
+}
