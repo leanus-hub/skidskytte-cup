@@ -102,9 +102,11 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   const clubNameById = new Map(clubs.map(club => [club.id, club.name]));
   const cupNameById = new Map((cups ?? []).map(cup => [cup.id, cup.name]));
 
+  let externalSeriesSeasons: {id:string;season_name:string;points_by_place:Record<string,number>;best_results_count:number|null;ties_same_points:boolean;external_series:{name:string}|{name:string}[]|null}[]=[];
   let externalImports: {id:string;source_type:string;source_name:string;event_name:string|null;event_date:string|null;status:string;row_count:number;created_at:string}[]=[];
   let externalRows: {id:string;source_row:number;athlete_name:string;club_name:string|null;class_name:string|null;place:number|null;status:string|null;shooting:number[];match_status:string;match_note:string|null}[]=[];
   if(section==='external'){
+    const {data:ess,error:esse}=await supabase.from('external_series_seasons').select('id,season_name,points_by_place,best_results_count,ties_same_points,external_series(name)').eq('active',true).order('season_name',{ascending:false});if(esse)throw new Error('Kunde inte läsa externa regelverk: '+esse.message);externalSeriesSeasons=(ess??[]) as typeof externalSeriesSeasons;
     if(!athletesAdmin.length){const {data:a,error:ae}=await supabase.from('athletes').select('id,full_name,club_id,birth_year,aliases,merged_into_id').is('merged_into_id',null).order('full_name');if(ae)throw new Error('Kunde inte läsa åkare: '+ae.message);athletesAdmin=a??[];}
     const {data:ei,error:eie}=await supabase.from('external_result_imports').select('id,source_type,source_name,event_name,event_date,status,row_count,created_at').order('created_at',{ascending:false}).limit(20);
     if(eie) throw new Error('Kunde inte läsa externa importer: '+eie.message); externalImports=ei??[];
@@ -318,7 +320,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     {section === 'external' && <section className="card admin-workspace">
       <h2>Externresultat</h2><p className="muted">Importera resultat från andra tävlingsserier utan att påverka Syd Cup-poäng. All data går först till en separat preview.</p>
       <form action={previewExternalResults} encType="multipart/form-data">
-        <div className="form-columns"><label>Källa<select name="source_type" defaultValue="csv"><option value="csv">CSV</option><option value="swecup">SweCup</option><option value="ibu">IBU</option><option value="other">Annan</option></select></label><label>Källnamn<input name="source_name" placeholder="SweCup Östersund"/></label></div>
+        <div className="form-columns"><label>Filformat<select name="source_type" defaultValue="csv"><option value="csv">CSV</option><option value="excel">Excel</option><option value="swecup">SweCup-export</option><option value="ibu">IBU-export</option><option value="other">Annan</option></select></label><label>Serie / regelverk<select name="series_season_id" defaultValue=""><option value="">Ingen serie</option>{externalSeriesSeasons.map(s=>{const series=Array.isArray(s.external_series)?s.external_series[0]:s.external_series;return <option key={s.id} value={s.id}>{series?.name??'Extern serie'} {s.season_name}</option>})}</select></label></div><div className="form-columns"><label>Källnamn<input name="source_name" placeholder="SweCup Östersund"/></label><label>Tävling<input name="event_name"/></label></div>
         <div className="form-columns"><label>Tävling<input name="event_name"/></label><label>Datum<input type="date" name="event_date"/></label></div>
         <label>Resultatfil<input type="file" name="file" accept=".csv,text/csv,text/plain" required/></label><small>Max 2 MB. Ingen rad förs över till officiella cupresultat.</small><button type="submit">Skapa preview</button>
       </form>
