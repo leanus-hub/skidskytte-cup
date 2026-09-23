@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import { addClassAlias, createCup, createSeason, deletePlannedRace, inviteAdmin, logout, setAdminRole, setRaceStatus, updatePlannedRace, movePlannedRace, updateCupSettings, cloneRuleset, updateRulesetSettings, updateRulesetClassRule, updateFeedbackItem, mergeAthletes, createShootingGroup, deleteShootingGroup } from './admin-actions';
 import { importRaceResultsSafe } from './import-actions';
+import { previewExternalResults, approveExternalPreview } from './external-import-actions';
 import ClubManager from './club-manager';
 import CupPlanBuilder from './cup-plan-builder';
 
@@ -17,7 +18,7 @@ function adminHref(section: string, params: Record<string,string|undefined> = {}
 
 export default async function AdminPage({ searchParams }: { searchParams: Promise<Params> }) {
   const params = await searchParams;
-  const section = ['season','cup','rules','plan','import','feedback','classes','clubs','athletes','admins'].includes(params.section ?? '') ? params.section! : 'home';
+  const section = ['season','cup','rules','plan','import','external','feedback','classes','clubs','athletes','admins'].includes(params.section ?? '') ? params.section! : 'home';
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect('/admin/login');
@@ -101,6 +102,14 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   const clubNameById = new Map(clubs.map(club => [club.id, club.name]));
   const cupNameById = new Map((cups ?? []).map(cup => [cup.id, cup.name]));
 
+  let externalImports: {id:string;source_type:string;source_name:string;event_name:string|null;event_date:string|null;status:string;row_count:number;created_at:string}[]=[];
+  let externalRows: {id:string;source_row:number;athlete_name:string;club_name:string|null;class_name:string|null;place:number|null;status:string|null;shooting:number[];match_status:string;match_note:string|null}[]=[];
+  if(section==='external'){
+    const {data:ei,error:eie}=await supabase.from('external_result_imports').select('id,source_type,source_name,event_name,event_date,status,row_count,created_at').order('created_at',{ascending:false}).limit(20);
+    if(eie) throw new Error('Kunde inte läsa externa importer: '+eie.message); externalImports=ei??[];
+    if(params.batch){const {data:er,error:ere}=await supabase.from('external_result_rows').select('id,source_row,athlete_name,club_name,class_name,place,status,shooting,match_status,match_note').eq('import_id',params.batch).order('source_row');if(ere)throw new Error('Kunde inte läsa preview: '+ere.message);externalRows=er??[];}
+  }
+
   const today = new Date().toISOString().slice(0,10);
   const cupDashboard = (cups ?? []).map(cup => {
     const cupRaces = (races ?? []).filter(r => r.cup_id === cup.id);
@@ -116,7 +125,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
 
   const nav = [
     ['home','Översikt'], ['season','Ny säsong'], ['cup','Ny cup'], ['rules','Regelverk'], ['plan','Tävlingsplan'],
-    ['import','Resultatflöde'], ['feedback','Ärenden'], ['classes','Klassalias'], ['clubs','Regioner & föreningar'], ['athletes','Åkare'], ['admins','Administratörer'],
+    ['import','Resultatflöde'], ['external','Externresultat'], ['feedback','Ärenden'], ['classes','Klassalias'], ['clubs','Regioner & föreningar'], ['athletes','Åkare'], ['admins','Administratörer'],
   ];
 
   return <>
@@ -305,5 +314,17 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
         </article>;
       })}</div>
     </section>}
+    {section === 'external' && <section className="card admin-workspace">
+      <h2>Externresultat</h2><p className="muted">Importera resultat från andra tävlingsserier utan att påverka Syd Cup-poäng. All data går först till en separat preview.</p>
+      <form action={previewExternalResults} encType="multipart/form-data">
+        <div className="form-columns"><label>Källa<select name="source_type" defaultValue="csv"><option value="csv">CSV</option><option value="swecup">SweCup</option><option value="ibu">IBU</option><option value="other">Annan</option></select></label><label>Källnamn<input name="source_name" placeholder="SweCup Östersund"/></label></div>
+        <div className="form-columns"><label>Tävling<input name="event_name"/></label><label>Datum<input type="date" name="event_date"/></label></div>
+        <label>Resultatfil<input type="file" name="file" accept=".csv,text/csv,text/plain" required/></label><small>Max 2 MB. Ingen rad förs över till officiella cupresultat.</small><button type="submit">Skapa preview</button>
+      </form>
+      {params.batch && <><h3>Preview</h3><div className="table-scroll"><table><thead><tr><th>Rad</th><th>Åkare</th><th>Klubb</th><th>Klass</th><th>Plac.</th><th>Skytte</th><th>Matchning</th></tr></thead><tbody>{externalRows.map(r=><tr key={r.id}><td>{r.source_row}</td><td><strong>{r.athlete_name}</strong></td><td>{r.club_name??'–'}</td><td>{r.class_name??'–'}</td><td>{r.place??'–'}</td><td>{r.shooting?.length?r.shooting.join(' '):'–'}</td><td><span className={'badge '+(r.match_status==='ambiguous'?'admin-attention':'')}>{r.match_status}</span><small>{r.match_note}</small></td></tr>)}</tbody></table></div>
+        <form action={approveExternalPreview}><input type="hidden" name="import_id" value={params.batch}/><button type="submit" disabled={externalRows.some(r=>['ambiguous','unmatched'].includes(r.match_status))}>Godkänn preview</button>{externalRows.some(r=>['ambiguous','unmatched'].includes(r.match_status))&&<p className="error-text">Osäkra åkaridentiteter måste lösas innan preview kan godkännas.</p>}</form></>}
+      <h3>Senaste externa importer</h3><div className="table-scroll"><table><thead><tr><th>Källa</th><th>Tävling</th><th>Datum</th><th>Rader</th><th>Status</th></tr></thead><tbody>{externalImports.map(i=><tr key={i.id}><td><Link href={adminHref('external',{batch:i.id})}>{i.source_name}</Link></td><td>{i.event_name??'–'}</td><td>{i.event_date??'–'}</td><td>{i.row_count}</td><td><span className="badge">{i.status}</span></td></tr>)}</tbody></table></div>
+    </section>}
+
   </>;
 }
