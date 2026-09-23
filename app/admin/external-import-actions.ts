@@ -109,3 +109,25 @@ export async function confirmExternalNewAthlete(formData:FormData){
  if(!remaining?.length) await supabase.from('external_result_imports').update({status:'preview'}).eq('id',importId).eq('status','needs_review');
  redirect(`/admin?section=external&batch=${importId}&success=athlete-resolved`);
 }
+
+
+export async function finalizeExternalImport(formData:FormData){
+ const {supabase}=await admin(); const id=text(formData,'import_id');
+ const {data:batch,error:be}=await supabase.from('external_result_imports').select('id,status,source_type,source_name,event_name,event_date').eq('id',id).single();
+ if(be||!batch) redirect('/admin?section=external&error=batch-not-found');
+ if(batch.status!=='approved') redirect(`/admin?section=external&batch=${id}&error=approval-required`);
+ const {data:rows,error:re}=await supabase.from('external_result_rows').select('*').eq('import_id',id).order('source_row');
+ if(re||!rows?.length) redirect(`/admin?section=external&batch=${id}&error=empty-preview`);
+ if(rows.some(r=>['ambiguous','unmatched'].includes(r.match_status))) redirect(`/admin?section=external&batch=${id}&error=review-required`);
+ const payload=rows.map(r=>({
+  import_id:id,source_row:r.source_row,athlete_id:r.matched_athlete_id,external_athlete_name:r.athlete_name,
+  club_name:r.club_name,class_name:r.class_name,event_name:batch.event_name,event_date:batch.event_date,
+  source_type:batch.source_type,source_name:batch.source_name,place:r.place,status:r.status,shooting:r.shooting,
+  shooting_hits:r.shooting_hits,shooting_shots:r.shooting_shots,raw_data:r.raw_data
+ }));
+ const {error:ie}=await supabase.from('external_results').upsert(payload,{onConflict:'import_id,source_row'});
+ if(ie) redirect(`/admin?section=external&batch=${id}&error=${encodeURIComponent(ie.message)}`);
+ const {error:ue}=await supabase.from('external_result_imports').update({status:'imported'}).eq('id',id).eq('status','approved');
+ if(ue) redirect(`/admin?section=external&batch=${id}&error=${encodeURIComponent(ue.message)}`);
+ redirect(`/admin?section=external&batch=${id}&success=external-import-complete`);
+}
