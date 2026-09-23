@@ -22,6 +22,7 @@ export async function previewExternalResults(formData:FormData){
  if(!(file instanceof File)||!file.size) redirect('/admin?section=external&error=missing-file');
  if(file.size>2_000_000) redirect('/admin?section=external&error=file-too-large');
  const sourceType=text(formData,'source_type')||'csv';
+ const seriesSeasonId=text(formData,'series_season_id')||null;
  const sourceName=text(formData,'source_name')||file.name;
  const eventName=text(formData,'event_name')||null;
  const eventDate=text(formData,'event_date')||null;
@@ -58,7 +59,7 @@ export async function previewExternalResults(formData:FormData){
 
  const {data:batch,error:be}=await supabase.from('external_result_imports').insert({
    source_type:sourceType,source_name:sourceName,event_name:eventName,event_date:eventDate,
-   status:needsReview?'needs_review':'preview',row_count:planned.length,created_by:user.id
+   status:needsReview?'needs_review':'preview',row_count:planned.length,created_by:user.id,series_season_id:seriesSeasonId
  }).select('id').single();
  if(be||!batch) redirect(`/admin?section=external&error=${encodeURIComponent(be?.message??'Kunde inte skapa preview')}`);
 
@@ -113,7 +114,7 @@ export async function confirmExternalNewAthlete(formData:FormData){
 
 export async function finalizeExternalImport(formData:FormData){
  const {supabase}=await admin(); const id=text(formData,'import_id');
- const {data:batch,error:be}=await supabase.from('external_result_imports').select('id,status,source_type,source_name,event_name,event_date').eq('id',id).single();
+ const {data:batch,error:be}=await supabase.from('external_result_imports').select('id,status,source_type,source_name,event_name,event_date,series_season_id').eq('id',id).single();
  if(be||!batch) redirect('/admin?section=external&error=batch-not-found');
  if(batch.status!=='approved') redirect(`/admin?section=external&batch=${id}&error=approval-required`);
  const {data:rows,error:re}=await supabase.from('external_result_rows').select('*').eq('import_id',id).order('source_row');
@@ -122,7 +123,7 @@ export async function finalizeExternalImport(formData:FormData){
  const payload=rows.map(r=>({
   import_id:id,source_row:r.source_row,athlete_id:r.matched_athlete_id,external_athlete_name:r.athlete_name,
   club_name:r.club_name,class_name:r.class_name,event_name:batch.event_name,event_date:batch.event_date,
-  source_type:batch.source_type,source_name:batch.source_name,place:r.place,status:r.status,shooting:r.shooting,
+  source_type:batch.source_type,source_name:batch.source_name,series_season_id:batch.series_season_id,place:r.place,status:r.status,shooting:r.shooting,
   shooting_hits:r.shooting_hits,shooting_shots:r.shooting_shots,raw_data:r.raw_data
  }));
  const {error:ie}=await supabase.from('external_results').upsert(payload,{onConflict:'import_id,source_row'});
