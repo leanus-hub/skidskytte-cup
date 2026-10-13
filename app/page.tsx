@@ -30,8 +30,13 @@ function href(params:Record<string,string|undefined>) {
 }
 
 function safeAverage(total:number, count:number) { return count > 0 ? total / count : 0; }
-function medalRank(rows:ClubStanding[]) {
-  return [...rows].sort((a,b)=>a.medal_place-b.medal_place || a.club_name.localeCompare(b.club_name,'sv'));
+function olympicMedals(cup: Cup) { return /sommar\s*2026/i.test(cup.name); }
+function medalRank(rows:ClubStanding[], olympic=false) {
+  return [...rows].sort((a,b)=>olympic ? b.gold-a.gold || b.silver-a.silver || b.bronze-a.bronze || a.club_name.localeCompare(b.club_name,'sv') : a.medal_place-b.medal_place || a.club_name.localeCompare(b.club_name,'sv'));
+}
+function medalPosition(rows:ClubStanding[], row:ClubStanding, olympic:boolean) {
+  if (!olympic) return row.medal_place;
+  return 1+rows.filter(other=>other.gold>row.gold || (other.gold===row.gold && other.silver>row.silver) || (other.gold===row.gold && other.silver===row.silver && other.bronze>row.bronze)).length;
 }
 function medalIcons(row: ClubStanding) {
   return `🥇 ${row.gold} · 🥈 ${row.silver} · 🥉 ${row.bronze}`;
@@ -132,7 +137,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
       const minRaceStarts=positiveRaces.length?Math.min(...positiveRaces.map(r=>r.regional_participants)):0;
       const smallestRaces=positiveRaces.filter(r=>r.regional_participants===minRaceStarts);
       const pointsLeader = [...cupClubs].sort((a,b)=>b.total_points-a.total_points || a.club_name.localeCompare(b.club_name,'sv'))[0];
-      const medalLeader = medalRank(cupClubs)[0];
+      const medalLeader = medalRank(cupClubs,olympicMedals(cup))[0];
       const maxClubStarts=Math.max(0,...cupClubs.map(r=>r.total_starts));
       const mostActiveClubs=cupClubs.filter(r=>r.total_starts===maxClubStarts).sort((a,b)=>a.club_name.localeCompare(b.club_name,'sv'));
       const maxClassStarts=Math.max(0,...cupClasses.map(r=>r.total_starts));
@@ -160,7 +165,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           <div className="dashboard-metric"><span>Deltagande klubbar</span><strong>{cupClubs.length}</strong></div>
           <div className="dashboard-metric"><span>Regionala starter</span><strong>{totalRegionalStarts}</strong></div>
           <div className="dashboard-leader"><span>Poängligan</span><strong>{pointsLeader?.club_name ?? '–'}</strong><small>{pointsLeader ? `${pointsLeader.total_points} poäng` : 'Inga resultat'}</small></div>
-          <div className="dashboard-leader"><span>Medaljligan</span><strong>{medalLeader?.club_name ?? '–'}</strong><small>{medalLeader ? `${medalLeader.medal_points} medaljpoäng · ${medalLeader.gold} guld` : 'Inga resultat'}</small></div>
+          <div className="dashboard-leader"><span>Medaljligan</span><strong>{medalLeader?.club_name ?? '–'}</strong><small>{medalLeader ? olympicMedals(cup) ? `${medalLeader.gold} guld · ${medalLeader.silver} silver · ${medalLeader.bronze} brons` : `${medalLeader.medal_points} medaljpoäng · ${medalLeader.gold} guld` : 'Inga resultat'}</small></div>
         </section>
 
         {view==='overview' && <>
@@ -213,7 +218,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
             <Link className={clubView==='medals'?'active':''} href={href({region:selectedRegionId,cup:selectedCupId,view:'club',clubView:'medals'})}>Medaljliga</Link>
           </nav>
           {clubView==='points' && <section className="card standings-card"><h3>Klubbarnas poängliga</h3><p className="table-note">Alla giltiga regionala resultat räknas i klubbkampen. Placering efter total cup-poäng; träffprocent används som skiljekriterium.</p><div className="table-scroll"><table><thead><tr><th>Plats</th><th>Klubb</th><th>Aktiva</th><th>Poäng</th><th>Starter</th><th>Poäng/start</th><th>Skytte</th></tr></thead><tbody>{clubs.filter(r=>r.cup_id===cupId).sort((a,b)=>a.club_place-b.club_place).map((row,index)=><tr key={row.club_id} className={index<3?'league-podium':''}><td><strong>{row.club_place}</strong></td><td><Link className="club-profile-link" href={`/klubbar/${row.club_id}`}><strong>{row.club_name}</strong><small className="club-medal-summary">{medalIcons(row)}</small><span>Visa klubbprofil →</span></Link></td><td>{row.athlete_count}</td><td><strong>{row.total_points}</strong></td><td>{row.total_starts}</td><td>{safeAverage(row.total_points,row.total_starts).toFixed(2)}</td><td>{pct(row.shooting_percentage)}</td></tr>)}</tbody></table></div></section>}
-          {clubView==='medals' && <section className="card standings-card"><h3>Klubbarnas medaljliga</h3><p className="table-note">Guld = 3, silver = 2 och brons = 1 medaljpoäng. Vid lika medaljpoäng avgör antal guld och därefter silver. Öppen Klass räknas inte in.</p><div className="table-scroll"><table><thead><tr><th>Plats</th><th>Klubb</th><th>Medaljpoäng</th><th>Guld</th><th>Silver</th><th>Brons</th><th>Medaljer</th></tr></thead><tbody>{medalRank(clubs.filter(r=>r.cup_id===cupId)).map((row,index)=><tr key={row.club_id} className={index<3?'league-podium':''}><td><strong>{row.medal_place}</strong></td><td><strong>{row.club_name}</strong><small className="club-medal-summary">{medalIcons(row)}</small></td><td><strong>{row.medal_points}</strong></td><td>{row.gold}</td><td>{row.silver}</td><td>{row.bronze}</td><td>{row.medals}</td></tr>)}</tbody></table></div></section>}
+          {clubView==='medals' && <section className="card standings-card"><h3>Klubbarnas medaljliga</h3><p className="table-note">{olympicMedals(cup) ? 'Olympisk medaljräkning: flest guld, därefter silver och brons. Öppen Klass räknas inte in.' : 'Guld = 3, silver = 2 och brons = 1 medaljpoäng. Vid lika medaljpoäng avgör antal guld och därefter silver. Öppen Klass räknas inte in.'}</p><div className="table-scroll"><table><thead><tr><th>Plats</th><th>Klubb</th>{!olympicMedals(cup) && <th>Medaljpoäng</th>}<th>Guld</th><th>Silver</th><th>Brons</th><th>Medaljer</th></tr></thead><tbody>{medalRank(clubs.filter(r=>r.cup_id===cupId),olympicMedals(cup)).map((row,index)=><tr key={row.club_id} className={index<3?'league-podium':''}><td><strong>{medalPosition(cupClubs,row,olympicMedals(cup))}</strong></td><td><strong>{row.club_name}</strong><small className="club-medal-summary">{medalIcons(row)}</small></td>{!olympicMedals(cup) && <td><strong>{row.medal_points}</strong></td>}<td>{row.gold}</td><td>{row.silver}</td><td>{row.bronze}</td><td>{row.medals}</td></tr>)}</tbody></table></div></section>}
         </>}
 
         {view==='statistics' && <>
